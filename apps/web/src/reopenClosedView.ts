@@ -5,6 +5,10 @@ import type { ClosedView, ClosedViewEntry } from "./closedViewStore";
 import type { PullRequestListPreferences } from "./components/pullRequest/pullRequestListPreferences";
 import { openPreviewSession } from "./components/preview/openPreviewSession";
 import {
+  parseWorkspaceTab,
+  useWorkspaceTabsStore,
+} from "./components/workspaceTabs/workspaceTabsStore";
+import {
   rightPanelHostRef,
   type RightPanelSurface,
   selectThreadRightPanelState,
@@ -20,6 +24,8 @@ export interface ReopenOwnerState {
   sideChatExists: boolean;
   shellLive: boolean;
   panel: ThreadRightPanelState;
+  /** For a top tab bar entry: whether its tab is open again already. */
+  workspaceTabOpen?: boolean;
 }
 
 export function planNextReopen(
@@ -39,11 +45,13 @@ export function planNextReopen(
       break;
     }
     const alreadyOpen =
-      entry.kind === "panel-tab"
-        ? owner.panel.isOpen && owner.panel.surfaces.some((s) => s.id === entry.surface.id)
-        : owner.panel.surfaces.some(
-            (s) => s.kind === "preview" && s.resourceId === entry.snapshot.tabId,
-          );
+      entry.kind === "workspace-tab"
+        ? owner.workspaceTabOpen === true
+        : entry.kind === "panel-tab"
+          ? owner.panel.isOpen && owner.panel.surfaces.some((s) => s.id === entry.surface.id)
+          : owner.panel.surfaces.some(
+              (s) => s.kind === "preview" && s.resourceId === entry.snapshot.tabId,
+            );
     if (alreadyOpen) {
       drop.push(entry);
       continue;
@@ -100,6 +108,14 @@ export async function reopenClosedView(
 ): Promise<boolean> {
   const panels = useRightPanelStore.getState();
   const ref = view.threadRef;
+
+  if (view.kind === "workspace-tab") {
+    // The caller then routes to the tab's thread, which shows a file tab over it.
+    const tabs = useWorkspaceTabsStore.getState();
+    if (parseWorkspaceTab(view.key)?.kind === "file") tabs.showSurface(view.key);
+    else tabs.open(view.key);
+    return true;
+  }
 
   if (view.kind === "browser") {
     const url = view.snapshot.navStatus._tag === "Idle" ? undefined : view.snapshot.navStatus.url;

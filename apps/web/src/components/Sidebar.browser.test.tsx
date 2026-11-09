@@ -6,7 +6,7 @@ import { render } from "../../test/render";
 import { openCommandPalette } from "../commandPaletteBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { __setClientSettingsForTests, getClientSettings } from "../hooks/useSettings";
-import { useProjects } from "../state/entities";
+import { readProjects, useProjects } from "../state/entities";
 import type { Project } from "../types";
 import Sidebar from "./Sidebar";
 import { SidebarProvider } from "./ui/sidebar";
@@ -20,6 +20,7 @@ vi.mock("../commandPaletteBus", () => ({
 vi.mock("./sidebar/SidebarChrome", () => ({
   SidebarChromeHeader: () => null,
   SidebarChromeFooter: () => null,
+  SidebarPrimaryNavItems: () => null,
 }));
 
 function project(id: string): Project {
@@ -57,6 +58,7 @@ describe("sidebar header new thread", () => {
     };
     const startThread = vi.fn().mockResolvedValue(null);
     vi.mocked(useProjects).mockReturnValue(projects);
+    vi.mocked(readProjects).mockReturnValue(projects);
     vi.mocked(useHandleNewThread).mockReturnValue({
       activeDraftThread: null,
       activeThread: null,

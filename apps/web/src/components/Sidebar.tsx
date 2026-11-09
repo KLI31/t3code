@@ -121,13 +121,14 @@ import {
   useThreadActions,
 } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
+import { readNewThreadProjectRef } from "../shortcuts/chatRouteCommands";
 import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
 import { useProjectPin } from "../hooks/useProjectGroupUpdate";
 import { useSidebarProjectGroups } from "../hooks/useSidebarProjectGroups";
 import { useTerminalFocus } from "../hooks/useTerminalFocus";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { registerSettleAndAdvance } from "../settleAndAdvance";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import { resolveThreadActionProjectRef } from "../lib/chatThreadActions";
 import { useClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -2963,27 +2964,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const showJumpHints = useThreadJumpHintsVisible(shouldShowJumpHintsNow);
 
   const handleNewThreadClick = (event?: ReactMouseEvent) => {
-    if (
-      shouldCreateNewThreadInCurrentProject(
-        event?.shiftKey ?? false,
-        scopeGroups.length,
-        projectGroups.length,
-      )
-    ) {
-      if (isMobile) setOpenMobile(false);
-      // With no current or open project, such as when every project is archived, pick one.
-      void startNewThreadFromContext({
-        activeDraftThread: newThreadContext.activeDraftThread,
-        activeThread: newThreadContext.activeThread ?? undefined,
-        defaultProjectRef: newThreadContext.defaultProjectRef,
-        handleNewThread,
-      }).then((started) => {
-        if (!started) openCommandPalette({ open: "new-thread-in" });
-      });
-      return;
-    }
+    const contextProjectRef = resolveThreadActionProjectRef({
+      activeDraftThread: newThreadContext.activeDraftThread,
+      activeThread: newThreadContext.activeThread ?? undefined,
+      defaultProjectRef: newThreadContext.defaultProjectRef,
+      handleNewThread,
+    });
+    // Shift starts in the current project; with none, such as when every project is archived, pick one.
+    const projectRef = event?.shiftKey
+      ? contextProjectRef
+      : readNewThreadProjectRef(contextProjectRef);
     if (isMobile) setOpenMobile(false);
-    openCommandPalette({ open: "new-thread-in" });
+    if (projectRef) void handleNewThread(projectRef);
+    else openCommandPalette({ open: "new-thread-in" });
   };
 
   const newThreadShortcutLabel =
