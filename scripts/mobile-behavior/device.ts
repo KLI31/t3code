@@ -30,7 +30,7 @@ export class DeviceError extends Schema.TaggedError<DeviceError>()("DeviceError"
 }) {}
 
 export const APP_ID = "com.t3tools.t3code.dev";
-export const SCHEME = "t3code-dev";
+export const SCHEME = "xencode-dev";
 
 export interface ProbeState {
   readonly route: {

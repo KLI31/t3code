@@ -169,7 +169,7 @@ describe("DesktopLinuxUrlHandler", () => {
     const entry = DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
       displayName: "Xen Code (Nightly)",
       execTarget: '/home/al ice/Apps/T3 "100%" $HOME\\x.AppImage',
-      scheme: "t3code",
+      scheme: "xencode",
       iconPath: "/home/al ice/icons/T3\\x.png",
     });
 
@@ -181,7 +181,7 @@ describe("DesktopLinuxUrlHandler", () => {
     );
     assert.include(entry, "NoDisplay=true");
     assert.notInclude(entry, "StartupWMClass=");
-    assert.include(entry, "MimeType=x-scheme-handler/t3code;");
+    assert.include(entry, "MimeType=x-scheme-handler/xencode;");
     assert.include(entry, "Icon=/home/al ice/icons/T3\\\\x.png");
   });
 
@@ -203,7 +203,7 @@ describe("DesktopLinuxUrlHandler", () => {
           recorded.files[0]?.content,
           "Exec=/home/alice/Applications/T3-Code.AppImage %U",
         );
-        assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/t3code;");
+        assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/xencode;");
         assert.deepEqual(recorded.commands, [
           {
             command: "update-desktop-database",
@@ -211,7 +211,7 @@ describe("DesktopLinuxUrlHandler", () => {
           },
           {
             command: "xdg-mime",
-            args: ["default", "io.github.kli31.XenCode.desktop", "x-scheme-handler/t3code"],
+            args: ["default", "io.github.kli31.XenCode.desktop", "x-scheme-handler/xencode"],
           },
         ]);
       });
@@ -229,7 +229,7 @@ describe("DesktopLinuxUrlHandler", () => {
         DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
           displayName: "Xen Code (Alpha)",
           execTarget: process.execPath,
-          scheme: "t3code",
+          scheme: "xencode",
           iconPath: "/home/alice/.local/share/icons/io.github.kli31.XenCode.desktop.png",
         }),
       );
@@ -256,7 +256,7 @@ describe("DesktopLinuxUrlHandler", () => {
         existingEntry: DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
           displayName: "Xen Code (Alpha)",
           execTarget: "/home/alice/Applications/T3-Code.AppImage",
-          scheme: "t3code",
+          scheme: "xencode",
           iconPath: "/home/alice/.local/share/icons/io.github.kli31.XenCode.desktop.png",
         }),
       });
@@ -270,7 +270,7 @@ describe("DesktopLinuxUrlHandler", () => {
         },
         {
           command: "xdg-mime",
-          args: ["default", "io.github.kli31.XenCode.desktop", "x-scheme-handler/t3code"],
+          args: ["default", "io.github.kli31.XenCode.desktop", "x-scheme-handler/xencode"],
         },
       ]);
     });
@@ -285,7 +285,7 @@ describe("DesktopLinuxUrlHandler", () => {
         existingEntry: DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
           displayName: "Xen Code (Alpha)",
           execTarget: "/home/alice/Applications/T3-Code.AppImage",
-          scheme: "t3code",
+          scheme: "xencode",
           iconPath,
         }),
       });

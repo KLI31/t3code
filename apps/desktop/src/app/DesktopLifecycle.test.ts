@@ -258,16 +258,16 @@ describe("DesktopLifecycle", () => {
         return yield* Deferred.await(relaunched);
       }).pipe(
         Effect.provide(layer),
-        Effect.provideService(HostProcess.ExecutablePath, "/opt/Xen Code/t3code"),
+        Effect.provideService(HostProcess.ExecutablePath, "/opt/Xen Code/xencode"),
         Effect.provideService(HostProcess.Arguments, [
-          "/opt/Xen Code/t3code",
+          "/opt/Xen Code/xencode",
           "--no-sandbox",
-          "T3CODE://pair?token=spent",
-          "t3code://new?prompt=hello",
+          "XENCODE://pair?token=spent",
+          "xencode://new?prompt=hello",
         ]),
       );
 
-      assert.deepEqual(options, { execPath: "/opt/Xen Code/t3code", args: ["--no-sandbox"] });
+      assert.deepEqual(options, { execPath: "/opt/Xen Code/xencode", args: ["--no-sandbox"] });
     }),
   );
 

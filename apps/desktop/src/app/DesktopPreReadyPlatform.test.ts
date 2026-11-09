@@ -161,7 +161,7 @@ describe("DesktopPreReadyPlatform", () => {
         assert.equal(identity.desktopName, "io.github.kli31.XenCode.desktop");
         assert.include(identity.desktopEntry ?? "", "Exec=/Applications/current.AppImage %U");
         assert.include(identity.desktopEntry ?? "", "Name=Xen Code");
-        assert.include(identity.desktopEntry ?? "", "MimeType=x-scheme-handler/t3code;");
+        assert.include(identity.desktopEntry ?? "", "MimeType=x-scheme-handler/xencode;");
         assert.include(
           identity.desktopEntry ?? "",
           "Icon=/xdg/icons/io.github.kli31.XenCode.desktop.png",
