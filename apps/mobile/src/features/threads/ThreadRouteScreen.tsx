@@ -89,10 +89,8 @@ import { useSelectedThreadGitActions } from "../../state/use-selected-thread-git
 import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-state";
 import { useSelectedThreadRequests } from "../../state/use-selected-thread-requests";
 import { useSelectedThreadWorktree } from "../../state/use-selected-thread-worktree";
-import {
-  updateThreadDraftModelSelection,
-  useThreadComposerState,
-} from "../../state/use-thread-composer-state";
+import { selectThreadModel } from "../../state/thread-model-selection";
+import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { resolveMergeBackTargetThreadId } from "@t3tools/client-runtime/state/thread-relationships";
 import { resolveLatestMergeBackRun } from "@t3tools/client-runtime/state/thread-workflows";
 import { threadEnvironment } from "../../state/threads";
@@ -346,8 +344,7 @@ function ThreadRouteContent(
     readonly selectedThreadDetailState: ReturnType<typeof useSelectedThreadDetailState>;
   },
 ) {
-  const { fileInspector, layout, panes, showInspector, toggleAuxiliaryPane } =
-    useAdaptiveWorkspaceLayout();
+  const { layout, panes, showInspector, toggleAuxiliaryPane } = useAdaptiveWorkspaceLayout();
   const { connectionState } = useRemoteConnectionStatus();
   const { onReconnectEnvironment } = useRemoteConnections();
   const {
@@ -562,13 +559,6 @@ function ThreadRouteContent(
     setChosenInspectorMode(props.renderInspector === undefined ? "files" : "route");
     showInspector();
   };
-  const handleToggleInspector = () => {
-    if (inspectorMode === null) {
-      handleOpenFilesInspector();
-      return;
-    }
-    toggleAuxiliaryPane();
-  };
   const handleSelectInspectorFile = (path: string) => {
     if (selectedThread === null) {
       return;
@@ -666,11 +656,10 @@ function ThreadRouteContent(
 
   const handleResumeQueue = () => resumeWith(null);
   const handleContinueOn = (modelSelection: ModelSelection) => {
-    if (composer.composerDraftKey !== null) {
-      updateThreadDraftModelSelection(
-        composer.composerDraftKey,
+    if (selectedThread) {
+      selectThreadModel(
+        { environmentId: selectedThread.environmentId, threadId: selectedThread.id },
         modelSelection,
-        serverConfig?.providers ?? [],
       );
     }
     return resumeWith(modelSelection);
@@ -979,9 +968,7 @@ function ThreadRouteContent(
                 subtitle={headerSubtitle}
                 gitControls={threadGitControlProps}
                 hasThreadCwd={selectedThreadCwd !== null}
-                fileInspectorSupported={fileInspector.supported}
                 inspectorMode={inspectorMode}
-                onToggleInspector={handleToggleInspector}
                 onOpenFilesInspector={handleOpenFilesInspector}
                 onReturnToThread={props.onReturnToThread}
               />
@@ -1083,7 +1070,6 @@ function ThreadRouteContent(
           offersSideChat={composer.sideChatUnavailableReason === null}
           onReconnectEnvironment={handleReconnectEnvironment}
           canSwitchThreadProvider={composer.canSwitchThreadProvider}
-          onUpdateThreadInteractionMode={composer.onUpdateInteractionMode}
           onRespondToApproval={requests.onRespondToApproval}
           onSelectUserInputOption={requests.onSelectUserInputOption}
           onChangeUserInputCustomAnswer={requests.onChangeUserInputCustomAnswer}

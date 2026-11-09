@@ -56,6 +56,7 @@ import {
   pickProjectFavicon,
   pickThemeFiles,
   setTheme,
+  syncHtmlFullscreen,
   showContextMenu,
 } from "./methods/window.ts";
 import {
@@ -85,6 +86,7 @@ import {
   getCliCommandState,
   installCliCommand,
   uninstallCliCommand,
+  addCliCommandToPath,
 } from "./methods/cliCommand.ts";
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
@@ -161,6 +163,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(checkSystemPermission);
   yield* ipc.handle(pasteAsText);
   yield* ipc.handle(revealWindow);
+  yield* ipc.handle(syncHtmlFullscreen);
   yield* ipc.handle(probeRemoteEditors);
   yield* ipc.handle(getUpdateState);
   yield* ipc.handle(setUpdateChannel);
@@ -170,6 +173,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(getCliCommandState);
   yield* ipc.handle(installCliCommand);
   yield* ipc.handle(uninstallCliCommand);
+  yield* ipc.handle(addCliCommandToPath);
   for (const previewMethod of PreviewIpc.methods) {
     // Explicit types preserve the error/service union of these heterogeneous preview methods.
     yield* ipc.handle<
