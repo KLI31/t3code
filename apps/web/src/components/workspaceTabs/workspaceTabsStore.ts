@@ -49,9 +49,27 @@ export interface WorkspaceSplit {
   readonly ratio: number;
 }
 
+/**
+ * `keys` plus `key` at the end. Past the cap the oldest unpinned tab goes, so a pinned
+ * tab is never closed for room.
+ */
+function withTab(
+  keys: ReadonlyArray<string>,
+  pinned: ReadonlyArray<string>,
+  key: string,
+): ReadonlyArray<string> {
+  if (keys.includes(key)) return keys;
+  const next = [...keys, key];
+  if (next.length <= MAX_TABS) return next;
+  const evict = next.findIndex((open) => open !== key && !pinned.includes(open));
+  if (evict !== -1) next.splice(evict, 1);
+  return next;
+}
+
 interface WorkspaceTabsState {
-  /** Tab keys, left to right. Per browser: each client keeps its own open set. */
+  /** Tab keys, left to right, pinned ones first. Per browser: each client keeps its own open set. */
   readonly keys: ReadonlyArray<string>;
+  readonly pinned: ReadonlyArray<string>;
   /** The open file or terminal tab shown over the routed thread, or null for the thread itself. */
   readonly surfaceKey: string | null;
   readonly split: WorkspaceSplit | null;
@@ -62,6 +80,9 @@ interface WorkspaceTabsState {
   close: (key: string) => void;
   /** Swaps `from` for `to` in place, as when a draft tab becomes its sent thread. */
   replace: (from: string, to: string) => void;
+  /** Moves `from` to where `to` sits, as when a tab is dragged onto another. Pinned tabs stay first. */
+  move: (from: string, to: string) => void;
+  togglePin: (key: string) => void;
   openSplit: (key: string, direction: WorkspaceSplitDirection) => void;
   /** Shows `key` in the split pane, keeping its direction and size. */
   setSplitKey: (key: string) => void;
@@ -73,21 +94,20 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
   persist(
     (set) => ({
       keys: [],
+      pinned: [],
       surfaceKey: null,
       split: null,
       open: (key) =>
         set((state) =>
-          state.keys.includes(key) ? state : { keys: [...state.keys, key].slice(-MAX_TABS) },
+          state.keys.includes(key) ? state : { keys: withTab(state.keys, state.pinned, key) },
         ),
       showSurface: (key) =>
-        set((state) => ({
-          surfaceKey: key,
-          keys: state.keys.includes(key) ? state.keys : [...state.keys, key].slice(-MAX_TABS),
-        })),
+        set((state) => ({ surfaceKey: key, keys: withTab(state.keys, state.pinned, key) })),
       hideSurface: () => set((state) => (state.surfaceKey === null ? state : { surfaceKey: null })),
       close: (key) =>
         set((state) => ({
           keys: state.keys.filter((open) => open !== key),
+          pinned: state.pinned.filter((open) => open !== key),
           surfaceKey: state.surfaceKey === key ? null : state.surfaceKey,
           split: state.split?.key === key ? null : state.split,
         })),
@@ -96,11 +116,40 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
           keys: state.keys.includes(to)
             ? state.keys.filter((open) => open !== from)
             : state.keys.map((open) => (open === from ? to : open)),
+          pinned: state.pinned.includes(from)
+            ? [...state.pinned.filter((open) => open !== from && open !== to), to]
+            : state.pinned,
           surfaceKey: state.surfaceKey === from ? null : state.surfaceKey,
         })),
+      move: (from, to) =>
+        set((state) => {
+          const index = state.keys.indexOf(to);
+          if (from === to || index === -1 || !state.keys.includes(from)) return state;
+          if (state.pinned.includes(from) !== state.pinned.includes(to)) return state;
+          const keys = state.keys.filter((open) => open !== from);
+          keys.splice(index, 0, from);
+          return { keys };
+        }),
+      togglePin: (key) =>
+        set((state) => {
+          if (!state.keys.includes(key)) return state;
+          const pinned = state.pinned.includes(key)
+            ? state.pinned.filter((open) => open !== key)
+            : [...state.pinned, key];
+          const others = state.keys.filter((open) => open !== key);
+          // Either way the tab lands at the seam: last pinned, or first unpinned.
+          return {
+            pinned,
+            keys: [
+              ...others.filter((open) => pinned.includes(open)),
+              key,
+              ...others.filter((open) => !pinned.includes(open)),
+            ],
+          };
+        }),
       openSplit: (key, direction) =>
         set((state) => ({
-          keys: state.keys.includes(key) ? state.keys : [...state.keys, key].slice(-MAX_TABS),
+          keys: withTab(state.keys, state.pinned, key),
           split: { key, direction, ratio: state.split?.ratio ?? 0.5 },
         })),
       setSplitKey: (key) =>
@@ -114,7 +163,7 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
     {
       name: "t3code:workspace-tabs:v1",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ keys: state.keys, split: state.split }),
+      partialize: (state) => ({ keys: state.keys, pinned: state.pinned, split: state.split }),
     },
   ),
 );

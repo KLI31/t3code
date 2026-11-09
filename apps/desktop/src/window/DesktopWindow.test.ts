@@ -71,7 +71,7 @@ function makeFakeBrowserWindow() {
     copyImageAt: vi.fn(),
     focus: vi.fn(),
     isDestroyed: vi.fn(() => false),
-    getURL: vi.fn(() => "t3code-dev://app/"),
+    getURL: vi.fn(() => "xencode-dev://app/"),
     getZoomLevel: vi.fn(() => zoomLevel),
     getZoomFactor: vi.fn(() => 1.2 ** zoomLevel),
     setZoomLevel: vi.fn((level: number) => {
@@ -94,6 +94,7 @@ function makeFakeBrowserWindow() {
     replaceMisspelling: vi.fn(),
     send: vi.fn(),
     setBackgroundThrottling: vi.fn(),
+    setIgnoreMenuShortcuts: vi.fn(),
     setWindowOpenHandler: vi.fn(),
     toggleDevTools: vi.fn(),
   };
@@ -143,6 +144,7 @@ function makeFakeBrowserWindow() {
     reloadIgnoringCache: webContents.reloadIgnoringCache,
     toggleDevTools: webContents.toggleDevTools,
     navigationHistory: webContents.navigationHistory,
+    setIgnoreMenuShortcuts: webContents.setIgnoreMenuShortcuts,
     send: webContents.send,
     setZoomLevel: webContents.setZoomLevel,
     setWindowButtonPosition: window.setWindowButtonPosition,
@@ -479,8 +481,32 @@ describe("DesktopWindow", () => {
     );
   });
 
+  it("restores a window saved 1px past a display edge, and nothing further out", () => {
+    const displays = [
+      { x: 0, y: 0, width: 1920, height: 1280 },
+      { x: 1920, y: 0, width: 1280, height: 1920 },
+    ];
+    const snappedBounds = { x: 1921, y: 30, width: 1280, height: 945 };
+
+    assert.strictEqual(
+      DesktopWindow.resolveInitialMainWindowBounds(snappedBounds, displays),
+      snappedBounds,
+    );
+    for (const bounds of [
+      { x: 1922, y: 30, width: 1280, height: 945 },
+      { x: 1918, y: 30, width: 1280, height: 945 },
+      { x: 1921, y: -2, width: 1279, height: 945 },
+      { x: 1920, y: 976, width: 1280, height: 946 },
+    ]) {
+      assert.deepEqual(
+        DesktopWindow.resolveInitialMainWindowBounds(bounds, displays),
+        DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE,
+      );
+    }
+  });
+
   it("rejects renderer navigations whose origin only serializes as null", () => {
-    for (const applicationUrl of ["t3code://app/", "t3code-dev://app/"]) {
+    for (const applicationUrl of ["xencode://app/", "xencode-dev://app/"]) {
       assert.isTrue(
         DesktopWindow.isSameOriginRendererNavigation({
           applicationUrl,
@@ -490,21 +516,21 @@ describe("DesktopWindow", () => {
       );
     }
     for (const navigationUrl of [
-      "t3code://other/",
-      "t3code://app.example/",
-      "t3code://app:8080/",
-      "t3code://user@other/",
+      "xencode://other/",
+      "xencode://app.example/",
+      "xencode://app:8080/",
+      "xencode://user@other/",
       "t3code:app",
-      "t3code-dev://app/",
+      "xencode-dev://app/",
       "file:///etc/passwd",
       "data:text/html,<p>hi</p>",
       "javascript:alert(1)",
       "about:blank",
-      "blob:t3code://app/0b5e2c4a",
+      "blob:xencode://app/0b5e2c4a",
     ]) {
       assert.isFalse(
         DesktopWindow.isSameOriginRendererNavigation({
-          applicationUrl: "t3code://app/",
+          applicationUrl: "xencode://app/",
           navigationUrl,
         }),
         navigationUrl,
@@ -622,7 +648,7 @@ describe("DesktopWindow", () => {
       }),
   );
 
-  it.effect("blocks only repeated Cmd+W input before it reaches the native window menu", () =>
+  it.effect("leaves Cmd+W to the renderer and blocks repeated presses", () =>
     Effect.gen(function* () {
       const fakeWindow = makeFakeBrowserWindow();
       const createCount = yield* Ref.make(0);
@@ -663,6 +689,13 @@ describe("DesktopWindow", () => {
         prevented = false;
         beforeInput(event, { ...input, meta: false });
         assert.isFalse(prevented);
+
+        assert.deepEqual(
+          fakeWindow.setIgnoreMenuShortcuts.mock.calls.map(([ignore]) => ignore),
+          [true, true, false],
+        );
+        beforeInput(event, { ...input, key: "r", isAutoRepeat: false });
+        assert.isFalse(fakeWindow.setIgnoreMenuShortcuts.mock.lastCall?.[0]);
       }).pipe(Effect.provide(layer));
     }),
   );
@@ -1126,9 +1159,9 @@ describe("DesktopWindow", () => {
           return yield* Effect.die("will-navigate listener was not registered");
         }
         for (const [url, expectedPrevented] of [
-          ["t3code-dev://app/threads?id=1#latest", false],
-          ["t3code-dev://other/", true],
-          ["t3code://app/", true],
+          ["xencode-dev://app/threads?id=1#latest", false],
+          ["xencode-dev://other/", true],
+          ["xencode://app/", true],
         ] as const) {
           const preventDefault = vi.fn();
           willNavigate({ preventDefault }, url);

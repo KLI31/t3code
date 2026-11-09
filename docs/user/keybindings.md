@@ -80,9 +80,15 @@ to show only actions.
 
 In a new thread, `Cmd+Shift+H` moves the draft to the next machine.
 
-In the composer, Return sends and `Shift+Return` inserts a new line. `Cmd+Return`
-also sends. To make Return insert a new line instead, change the Return key
-behavior in Settings → Keyboard.
+In the composer, Return sends and `Shift+Return` inserts a new line. While a
+turn is running, `Cmd+Return` sends with the other follow-up action. To make
+Return insert a new line instead, change the Return key behavior in Settings →
+Keyboard; `Cmd+Return` then sends.
+
+## Android
+
+With a hardware keyboard, the composer handles Return as on iPad, with `Ctrl` in
+place of `Cmd`. The on-screen keyboard's Return always inserts a new line.
 
 ## Edit the configuration file
 
@@ -169,20 +175,28 @@ field gets its own undo back. Terminals always keep their native shortcut.
 `navigation.back` (`mod+[` by default) and `navigation.forward` (`mod+]`) move
 through the pages you have visited, like a browser's back and forward buttons.
 
-`chat.new` may ask you to choose a project when there is more than one.
+`chat.new` starts in the project the sidebar is narrowed to, and otherwise may ask
+you to choose a project when there is more than one.
 `chat.newLocal` skips that chooser. Both use your
 [new-thread defaults](./thread-sidebar.md#start-a-thread). `chat.newWithoutProject`
 (`mod+alt+n`) starts a thread [without a project](./thread-sidebar.md#start-without-a-project).
 
+`tab.next` (`ctrl+tab`) and `tab.previous` (`ctrl+shift+tab`) cycle through the top
+tab bar. `tab.jump.1` through `tab.jump.9` (`alt+1` to `alt+9`) select a tab by
+position; `alt+9` selects the last one. In a browser, `ctrl+tab` switches browser
+tabs instead, so rebind them if you use the web app.
+
 ## Reserved shortcuts
 
-In the desktop app, `mod+w` closes the focused terminal or the active right-panel
-tab. When nothing remains to close, it does nothing; it never closes the window. In a browser, `mod+w`
+In the desktop app, `mod+w` closes the focused terminal, then the active right-panel
+tab, then the active tab in the top tab bar. When nothing remains to close, it does
+nothing; it never closes the window. In a browser, `mod+w`
 closes the browser tab; rebind `rightPanel.close` and `terminal.close` to an available
 shortcut such as `alt+w`.
 
-`mod+shift+t` reopens the last closed tab across the app, including files,
-diffs, pull requests, browsers, and devices, in the order you closed them.
+`mod+shift+t` reopens the last closed tab across the app, including threads in
+the top tab bar, files, diffs, pull requests, browsers, and devices, in the order
+you closed them.
 A browser opens in a fresh session without its old page history. Incognito tabs
 can reopen until you reload or quit the app. This shortcut does not undo deleted work.
 Browsers also use it to reopen browser tabs; choose another binding in Settings

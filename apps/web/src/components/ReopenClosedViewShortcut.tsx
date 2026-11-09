@@ -42,6 +42,7 @@ import {
   resolveThreadRouteTarget,
 } from "../threadRoutes";
 import { toastManager } from "./ui/toast";
+import { useWorkspaceTabsStore } from "./workspaceTabs/workspaceTabsStore";
 
 const PREVIEW_FORWARDED_COMMANDS = [
   "workspace.focusNext",
@@ -84,6 +85,7 @@ export function ReopenClosedViewShortcut() {
     const catalog = appAtomRegistry.get(environmentCatalog.catalogValueAtom);
     const drafts = useComposerDraftStore.getState();
     const panelsByThread = useRightPanelStore.getState().byThreadKey;
+    const openTabKeys = useWorkspaceTabsStore.getState().keys;
     const { drop, restore } = planNextReopen(useClosedViewStore.getState().entries, (entry) => {
       const ref = entry.threadRef;
       const panel = selectThreadRightPanelState(panelsByThread, ref);
@@ -108,6 +110,7 @@ export function ReopenClosedViewShortcut() {
         shellLive:
           appAtomRegistry.get(environmentShell.stateValueAtom(ref.environmentId)).status === "live",
         panel,
+        workspaceTabOpen: entry.kind === "workspace-tab" && openTabKeys.includes(entry.key),
       };
     });
     for (const entry of drop) useClosedViewStore.getState().remove(entry.id);

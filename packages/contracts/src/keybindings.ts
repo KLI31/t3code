@@ -34,6 +34,18 @@ export const MODEL_PICKER_JUMP_KEYBINDING_COMMANDS = [
 export type ModelPickerJumpKeybindingCommand =
   (typeof MODEL_PICKER_JUMP_KEYBINDING_COMMANDS)[number];
 
+export const TAB_JUMP_KEYBINDING_COMMANDS = [
+  "tab.jump.1",
+  "tab.jump.2",
+  "tab.jump.3",
+  "tab.jump.4",
+  "tab.jump.5",
+  "tab.jump.6",
+  "tab.jump.7",
+  "tab.jump.8",
+  "tab.jump.9",
+] as const;
+
 const THREAD_KEYBINDING_COMMANDS = [
   "thread.stop",
   "thread.steerQueuedMessage",
@@ -71,6 +83,9 @@ export const STATIC_KEYBINDING_COMMANDS = [
   "rightPanel.toggleMaximized",
   "rightPanel.close",
   "view.reopenClosed",
+  "tab.next",
+  "tab.previous",
+  ...TAB_JUMP_KEYBINDING_COMMANDS,
   "pullRequest.copyNumber",
   "diff.toggle",
   "preview.toggle",

@@ -15,6 +15,7 @@ import { installDesktopIpcHandlers } from "../ipc/DesktopIpcHandlers.ts";
 import * as DesktopAppActivation from "./DesktopAppActivation.ts";
 import * as DesktopAppIdentity from "./DesktopAppIdentity.ts";
 import * as DesktopClerk from "./DesktopClerk.ts";
+import * as DesktopCliCommand from "./DesktopCliCommand.ts";
 import * as DesktopApplicationMenu from "../window/DesktopApplicationMenu.ts";
 import * as DesktopQuickComposer from "../window/DesktopQuickComposer.ts";
 import * as DesktopTray from "../window/DesktopTray.ts";
@@ -197,6 +198,18 @@ const bootstrap = Effect.gen(function* () {
   // Before the main window exists, so the composer can follow it out on close.
   yield* (yield* DesktopQuickComposer.DesktopQuickComposer).initialize;
   yield* (yield* DesktopTray.DesktopTray).initialize;
+  // Only the user's own login shell PATH shows every t3 a new terminal runs; a fresh install has
+  // no cached one. Without it, the command is left to Settings.
+  const installCli = (yield* DesktopCliCommand.DesktopCliCommand).installOnFirstLaunch;
+  yield* Effect.forkScoped(
+    (yield* DesktopShellEnvironment.DesktopShellEnvironment).awaitUserShellDiscovery.pipe(
+      Effect.flatMap((found) =>
+        found || environment.platform === "win32"
+          ? installCli
+          : logBootstrapInfo("skipped installing the t3 command without the shell PATH"),
+      ),
+    ),
+  );
 
   if (!settings.localEnvironmentEnabled) {
     yield* logBootstrapInfo("bootstrap skipping local environment (disabled in settings)");

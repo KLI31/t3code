@@ -82,6 +82,41 @@ export function resolveThreadActionProjectRef(
   return context.defaultProjectRef;
 }
 
+interface NewThreadProjectGroup {
+  readonly projectKey: string;
+  readonly archived: boolean;
+  readonly isScratch?: boolean | undefined;
+  readonly environmentId: EnvironmentId;
+  readonly id: ProjectId;
+  readonly memberProjectRefs: ReadonlyArray<ScopedProjectRef>;
+}
+
+/**
+ * Where "New thread" starts: the one project the sidebar is narrowed to, else the current
+ * project when only one is open, else null so the caller asks which project.
+ */
+export function resolveNewThreadProjectRef(input: {
+  readonly groups: ReadonlyArray<NewThreadProjectGroup>;
+  readonly scopeKeys: ReadonlyArray<string>;
+  readonly contextProjectRef: ScopedProjectRef | null;
+}): ScopedProjectRef | null {
+  const openGroups = input.groups.filter((group) => !group.archived);
+  const scoped = openGroups.filter(
+    (group) => !group.isScratch && input.scopeKeys.includes(group.projectKey),
+  );
+  const [scopedGroup] = scoped;
+  if (scoped.length === 1 && scopedGroup) {
+    const context = input.contextProjectRef;
+    const contextInGroup =
+      context !== null &&
+      scopedGroup.memberProjectRefs.some(
+        (ref) => ref.environmentId === context.environmentId && ref.projectId === context.projectId,
+      );
+    return contextInGroup ? context : scopeProjectRef(scopedGroup.environmentId, scopedGroup.id);
+  }
+  return openGroups.length === 1 || input.groups.length === 0 ? input.contextProjectRef : null;
+}
+
 export async function startNewThreadFromContext(
   context: ChatThreadActionContext,
 ): Promise<boolean> {

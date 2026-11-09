@@ -6,7 +6,7 @@ import { render } from "../../test/render";
 import { openCommandPalette } from "../commandPaletteBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { __setClientSettingsForTests, getClientSettings } from "../hooks/useSettings";
-import { useProjects } from "../state/entities";
+import { readProjects, useProjects } from "../state/entities";
 import type { Project } from "../types";
 import Sidebar from "./Sidebar";
 import { SidebarProvider } from "./ui/sidebar";
@@ -20,6 +20,7 @@ vi.mock("../commandPaletteBus", () => ({
 vi.mock("./sidebar/SidebarChrome", () => ({
   SidebarChromeHeader: () => null,
   SidebarChromeFooter: () => null,
+  SidebarPrimaryNavItems: () => null,
 }));
 
 function project(id: string): Project {
@@ -42,7 +43,6 @@ describe("sidebar header new thread", () => {
     { mode: "boring", count: 2, shift: false, picker: true },
     { mode: "boring", count: 2, shift: true, picker: false },
     { mode: "boring", count: 1, shift: false, picker: false },
-    { mode: "legacy", count: 2, shift: false, picker: false },
   ] as const)("$mode sidebar, $count projects, shift=$shift: picker=$picker", async (scenario) => {
     using stack = new DisposableStack();
     const previousSettings = getClientSettings();
@@ -50,7 +50,6 @@ describe("sidebar header new thread", () => {
     __setClientSettingsForTests({
       ...DEFAULT_CLIENT_SETTINGS,
       boringSidebarEnabled: scenario.mode === "boring",
-      legacySidebarEnabled: scenario.mode === "legacy",
     });
     const projects = [project("active"), project("idle")].slice(0, scenario.count);
     const currentProjectRef = {
@@ -59,6 +58,7 @@ describe("sidebar header new thread", () => {
     };
     const startThread = vi.fn().mockResolvedValue(null);
     vi.mocked(useProjects).mockReturnValue(projects);
+    vi.mocked(readProjects).mockReturnValue(projects);
     vi.mocked(useHandleNewThread).mockReturnValue({
       activeDraftThread: null,
       activeThread: null,

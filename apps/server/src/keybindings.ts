@@ -220,7 +220,6 @@ export class Keybindings extends Context.Service<
 
     readonly streamChanges: Stream.Stream<KeybindingsChangeEvent>;
 
-    
     readonly subscribeChanges: Effect.Effect<
       Stream.Stream<KeybindingsChangeEvent>,
       never,

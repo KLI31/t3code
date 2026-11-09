@@ -15,11 +15,7 @@ import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
-import type {
-  EnvironmentThread,
-  ThreadStructure,
-  EnvironmentThreadShell,
-} from "@t3tools/client-runtime/state/shell";
+import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
@@ -872,18 +868,6 @@ function threadHasStarted(thread: Thread | null | undefined): boolean {
   return Boolean(thread && (thread.latestRun !== null || thread.itemCount > 0 || thread.runtime));
 }
 
-export function threadShellHasStarted(
-  shell:
-    | Pick<EnvironmentThreadShell, "latestRun" | "latestUserMessageAt" | "runtime">
-    | null
-    | undefined,
-): boolean {
-  return Boolean(
-    shell &&
-    (shell.latestRun !== null || shell.latestUserMessageAt !== null || shell.runtime !== null),
-  );
-}
-
 // Imported history lacks a session until its first prompt; resolve its instance before locking the driver.
 export function deriveLockedProvider(input: {
   thread: Thread | null | undefined;
@@ -1162,7 +1146,7 @@ export function shouldRefocusComposerOnWindowFocus(
   }
   return (
     activeElement.closest(
-      '[data-workspace-area]:focus-visible, [data-sidebar-row]:focus-visible, [role="dialog"], [role="alertdialog"], [role="application"], [role="menu"], [role="listbox"], [data-slot$="-popup"], [data-terminal-owner]',
+      '[data-workspace-keyboard-focus], [data-sidebar-row]:focus-visible, [role="dialog"], [role="alertdialog"], [role="application"], [role="menu"], [role="listbox"], [data-slot$="-popup"], [data-terminal-owner]',
     ) === null
   );
 }

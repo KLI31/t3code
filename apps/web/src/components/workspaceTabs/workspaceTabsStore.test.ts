@@ -42,7 +42,7 @@ describe("parseWorkspaceTab", () => {
 });
 
 function setup() {
-  useWorkspaceTabsStore.setState({ keys: ["a", "b"], surfaceKey: null, split: null });
+  useWorkspaceTabsStore.setState({ keys: ["a", "b"], pinned: [], surfaceKey: null, split: null });
   return useWorkspaceTabsStore.getState();
 }
 
@@ -55,6 +55,41 @@ describe("workspace tabs", () => {
     expect(useWorkspaceTabsStore.getState().keys).toEqual(["a", "b", "thread", "c"]);
     store.replace("thread", "a");
     expect(useWorkspaceTabsStore.getState().keys).toEqual(["a", "b", "c"]);
+  });
+
+  it("moves a dragged tab to its drop target's place, either way", () => {
+    const store = setup();
+    store.open("c");
+    store.move("a", "c");
+    expect(useWorkspaceTabsStore.getState().keys).toEqual(["b", "c", "a"]);
+    store.move("a", "b");
+    expect(useWorkspaceTabsStore.getState().keys).toEqual(["a", "b", "c"]);
+    store.move("gone", "b");
+    expect(useWorkspaceTabsStore.getState().keys).toEqual(["a", "b", "c"]);
+  });
+
+  it("keeps pinned tabs first, out of reach of drags and the tab cap", () => {
+    const store = setup();
+    store.open("c");
+    store.togglePin("c");
+    store.togglePin("b");
+    expect(useWorkspaceTabsStore.getState()).toMatchObject({
+      keys: ["c", "b", "a"],
+      pinned: ["c", "b"],
+    });
+    store.move("a", "c");
+    expect(useWorkspaceTabsStore.getState().keys).toEqual(["c", "b", "a"]);
+
+    for (let index = 0; index < 12; index += 1) store.open(`t${index}`);
+    const { keys } = useWorkspaceTabsStore.getState();
+    expect(keys.slice(0, 2)).toEqual(["c", "b"]);
+    expect(keys).toHaveLength(12);
+    expect(keys).not.toContain("a");
+
+    store.replace("b", "b-thread");
+    store.togglePin("c");
+    expect(useWorkspaceTabsStore.getState().keys.slice(0, 2)).toEqual(["b-thread", "c"]);
+    expect(useWorkspaceTabsStore.getState().pinned).toEqual(["b-thread"]);
   });
 });
 

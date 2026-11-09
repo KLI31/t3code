@@ -80,7 +80,7 @@ const RELEASE_ASSETS = {
 const VARIANT_CONFIG = {
   development: {
     appName: "T3 Code Dev",
-    scheme: "t3code-dev",
+    scheme: "xencode-dev",
     iosBundleIdentifier: "com.t3tools.t3code.dev",
     androidPackage: "com.t3tools.t3code.dev",
     relyingParty: "clerk.t3.codes",
@@ -88,7 +88,7 @@ const VARIANT_CONFIG = {
   },
   preview: {
     appName: "T3 Code Preview",
-    scheme: "t3code-preview",
+    scheme: "xencode-preview",
     iosBundleIdentifier: "com.t3tools.t3code.preview",
     androidPackage: "com.t3tools.t3code.preview",
     relyingParty: "clerk.t3.codes",
@@ -96,7 +96,7 @@ const VARIANT_CONFIG = {
   },
   production: {
     appName: "T3 Code",
-    scheme: "t3code",
+    scheme: "xencode",
     iosBundleIdentifier: "com.t3tools.t3code",
     androidPackage: "com.t3tools.t3code",
     relyingParty: "clerk.t3.codes",
@@ -195,7 +195,12 @@ const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
         displayName: "Agent Activity",
         description: "Shows the current state of active T3 Code agents.",
         android: null,
-        ios: { supportedFamilies: ["systemSmall", "systemMedium", "accessoryRectangular"] },
+        ios: {
+          supportedFamilies: ["systemSmall", "systemMedium", "accessoryRectangular"],
+          // Embeds the layout so the gallery preview and a new widget render
+          // before the app has run once; the app replaces it on publish.
+          initialLayout: "./src/widgets/AgentActivityWidget.tsx",
+        },
       },
     ],
   },
@@ -321,7 +326,6 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-asset",
-    "react-native-pdf-jsi",
     [
       "expo-font",
       {
@@ -453,6 +457,8 @@ const config: ExpoConfig = {
     "./plugins/withAndroidModernPopupMenu.cjs",
     "./plugins/withAndroidModernAlertDialog.cjs",
     "./plugins/withAndroidPredictiveBackCompat.cjs",
+    // MainActivity mods run in reverse order; extend the tablet-orientation override.
+    "./plugins/withAndroidWindowDisplayMetrics.cjs",
     "./plugins/withAndroidTabletOrientation.cjs",
     ...(isIosPersonalTeamBuild ? ["./plugins/withoutIosPersonalTeamCapabilities.cjs"] : []),
   ],

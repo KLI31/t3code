@@ -54,7 +54,7 @@ import { installChatRouteCommands } from "./shortcuts/chatRouteCommands";
 import { startWorkspaceFocus } from "./lib/workspaceFocus";
 import { installCommandPaletteCommands } from "./shortcuts/commandPaletteCommands";
 import { registerOpenFavoriteEditorCommand } from "./components/chat/OpenInPickerShortcut";
-import { environmentThreadShells } from "./state/threads";
+import { environmentThreadShells, threadEnvironment } from "./state/threads";
 import { resolveThreadRouteTarget } from "./threadRoutes";
 import { isQuickComposerWindow } from "./quickComposer";
 
@@ -216,6 +216,7 @@ export function startAppServices(): AppRouter {
     threadShellAtom: environmentThreadShells.threadShellAtom,
     threadRefsAtom: environmentThreadShells.threadRefsAtom,
     shellStateAtom: environmentShell.stateAtom,
+    pendingThreadIdsAtom: threadEnvironment.pendingThreadIdsAtom,
   });
   startMainAppLocationTracking(router);
   startWorkspaceFocus(router);

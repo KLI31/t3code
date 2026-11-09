@@ -7,6 +7,7 @@ import {
   MODEL_PICKER_JUMP_KEYBINDING_COMMANDS,
   type ResolvedKeybindingRule,
   type ResolvedKeybindingsConfig,
+  TAB_JUMP_KEYBINDING_COMMANDS,
   THREAD_JUMP_KEYBINDING_COMMANDS,
 } from "@t3tools/contracts";
 
@@ -134,6 +135,14 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
     key: `mod+${index + 1}`,
     command,
     when: "!modelPickerOpen && isDesktop",
+  })),
+  { key: "ctrl+tab", command: "tab.next" },
+  { key: "ctrl+shift+tab", command: "tab.previous" },
+  // mod+digit already jumps to sidebar threads, so the tab bar takes alt+digit.
+  ...TAB_JUMP_KEYBINDING_COMMANDS.map((command, index) => ({
+    key: `alt+${index + 1}`,
+    command,
+    when: "!terminalFocus",
   })),
   ...MODEL_PICKER_JUMP_KEYBINDING_COMMANDS.map((command, index) => ({
     key: `mod+${index + 1}`,

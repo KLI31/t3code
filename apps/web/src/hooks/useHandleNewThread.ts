@@ -14,6 +14,7 @@ import {
   useComposerDraftStore,
 } from "../composerDraftStore";
 import { newDraftId, newThreadId } from "../lib/utils";
+import { dispatchSnapShotComposerFocus } from "../lib/desktopSnapShot";
 import { orderItemsByPreferredIds } from "../components/Sidebar.logic";
 import {
   deriveLogicalProjectKeyFromSettings,
@@ -322,6 +323,8 @@ export function createNewThreadHandler(router: AnyRouter) {
           routeTargetAfterWrites?.kind === "draft" &&
           routeTargetAfterWrites.draftId === emptyStoredDraftThread.draftId
         ) {
+          // Already on this project's empty draft: focus its composer so the request visibly lands.
+          dispatchSnapShotComposerFocus();
           return opened;
         }
         await router.navigate({
@@ -356,6 +359,7 @@ export function createNewThreadHandler(router: AnyRouter) {
         ...pickExplicitWorkspaceOptions(options),
       });
       seedPrompt(currentRouteTarget.draftId);
+      dispatchSnapShotComposerFocus();
       return Promise.resolve({
         draftId: currentRouteTarget.draftId,
         threadId: latestActiveDraftThread.threadId,

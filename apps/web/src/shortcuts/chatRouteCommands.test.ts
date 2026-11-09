@@ -3,6 +3,7 @@ import type { AnyRouter } from "@tanstack/react-router";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import * as commandPalette from "../commandPaletteBus";
+import * as newThread from "../hooks/useHandleNewThread";
 import * as settings from "../hooks/useSettings";
 import * as threadActions from "../lib/chatThreadActions";
 import * as entities from "../state/entities";
@@ -26,22 +27,24 @@ function project(id: string): Project {
 
 describe("new thread commands", () => {
   it.each([
-    { mode: "normal", count: 2, command: "chat.new", picker: true },
-    { mode: "boring", count: 2, command: "chat.new", picker: true },
-    { mode: "boring", count: 1, command: "chat.new", picker: false },
-    { mode: "legacy", count: 2, command: "chat.new", picker: false },
-    { mode: "boring", count: 2, command: "chat.newLocal", picker: false },
-  ] as const)("$mode sidebar, $count projects, $command: picker=$picker", (scenario) => {
+    { mode: "normal", count: 2, command: "chat.new", starts: "picker" },
+    { mode: "boring", count: 2, command: "chat.new", starts: "picker" },
+    { mode: "boring", count: 1, command: "chat.new", starts: "project" },
+    { mode: "boring", count: 2, command: "chat.newLocal", starts: "local" },
+  ] as const)("$mode sidebar, $count projects, $command: starts $starts", (scenario) => {
     using _settings = vi.spyOn(settings, "getClientSettings").mockReturnValue({
       ...DEFAULT_CLIENT_SETTINGS,
       boringSidebarEnabled: scenario.mode === "boring",
-      legacySidebarEnabled: scenario.mode === "legacy",
     });
     using _projects = vi
       .spyOn(entities, "readProjects")
       .mockReturnValue([project("active"), project("idle")].slice(0, scenario.count));
     using openPicker = vi.spyOn(commandPalette, "openCommandPalette").mockImplementation(() => {});
     using startLocal = vi.spyOn(threadActions, "startNewThreadFromContext").mockResolvedValue(true);
+    const startInProject = vi.fn().mockResolvedValue(null);
+    using _handler = vi
+      .spyOn(newThread, "createNewThreadHandler")
+      .mockReturnValue(startInProject as unknown as newThread.NewThreadHandler);
     using register = vi.spyOn(dispatcher, "registerCommands").mockReturnValue(() => {});
     const router = { state: { matches: [] } } as unknown as AnyRouter;
     using stack = new DisposableStack();
@@ -54,12 +57,12 @@ describe("new thread commands", () => {
 
     commands[scenario.command]!(event);
 
-    if (scenario.picker) {
-      expect(openPicker).toHaveBeenCalledWith({ open: "new-thread-in" });
-      expect(startLocal).not.toHaveBeenCalled();
-    } else {
-      expect(openPicker).not.toHaveBeenCalled();
-      expect(startLocal).toHaveBeenCalledOnce();
-    }
+    expect(openPicker.mock.calls.length > 0).toBe(scenario.starts === "picker");
+    expect(startInProject.mock.calls[0]?.[0]).toEqual(
+      scenario.starts === "project"
+        ? { environmentId: EnvironmentId.make("local"), projectId: ProjectId.make("active") }
+        : undefined,
+    );
+    expect(startLocal.mock.calls.length).toBe(scenario.starts === "local" ? 1 : 0);
   });
 });

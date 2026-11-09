@@ -93,7 +93,7 @@ in the receiving app. Connection settings are under **Settings → Environments*
 on web and desktop and **Settings → Environments** on mobile. A loopback address
 such as `127.0.0.1` reaches only the device opening the link.
 
-On a computer with the desktop app, you can open the printed `t3code://pair`
+On a computer with the desktop app, you can open the printed `xencode://pair`
 app link instead. The desktop app asks you to confirm the server address, then
 adds it.
 
@@ -288,9 +288,8 @@ command to run on the host:
 sudo t3 browser setup
 ```
 
-The server shows the exact line for how you started it, such as
-`sudo npx t3 browser setup`, and keeps your `PATH` when Node is installed only
-for your user. Where `t3` is not on your `PATH`, such as with only the
+The server shows the exact line for how you started it, and keeps your `PATH`
+when you started it with `npx` and Node is installed only for your user. Where `t3` is not on your `PATH`, such as with only the
 desktop app installed, it names the full path of the app's own `t3` instead. It allows Chrome's sandbox with an AppArmor profile and installs
 any missing libraries and system fonts with apt; pages that load without text
 can mean the host has no fonts. It is safe to run again. Without `sudo`, it only
@@ -379,11 +378,11 @@ expires.
 To choose a token's permissions, pass `--scope` once for each scope you want:
 
 ```sh
-npx t3 pair --scope orchestration:read --scope relay:read
+t3 pair --scope orchestration:read --scope relay:read
 ```
 
 The selected scopes replace the default permissions. The same option works with
-`npx t3 auth pairing create` and `npx t3 auth session issue`; each command's
+`t3 auth pairing create` and `t3 auth session issue`; each command's
 `--help` lists the available scopes. Without `--scope`, pairing tokens and issued
 bearer sessions get every permission, including managing access and T3 Connect.
 A terminal or a full-access agent on the host can reach those as well, so a

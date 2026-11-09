@@ -10,7 +10,7 @@ import {
 } from "./appLinking";
 
 describe("shouldHandleAppLink", () => {
-  it.each(["t3code://", "t3code:///", "t3code-dev://", "t3code-preview://"])(
+  it.each(["xencode://", "xencode:///", "xencode-dev://", "xencode-preview://"])(
     "ignores scheme-only URL %s",
     (url) => {
       expect(shouldHandleAppLink(url, true)).toBe(false);
@@ -18,15 +18,15 @@ describe("shouldHandleAppLink", () => {
   );
 
   it.each([
-    "t3code://threads/env-1/thread-1",
-    "t3code://pair?pairingUrl=x",
-    "t3code-dev://settings/usage?tab=limits",
-    "https://app.t3.codes/threads/env/thread?prompt=Fix%20expo-development-client%20and%20t3code://expo-sharing",
+    "xencode://threads/env-1/thread-1",
+    "xencode://pair?pairingUrl=x",
+    "xencode-dev://settings/usage?tab=limits",
+    "https://app.t3.codes/threads/env/thread?prompt=Fix%20expo-development-client%20and%20xencode://expo-sharing",
   ])("handles path-bearing URL %s", (url) => {
     expect(shouldHandleAppLink(url, true)).toBe(true);
   });
 
-  it.each(["t3code://expo-development-client/?url=x", "t3code://expo-sharing/anything"])(
+  it.each(["xencode://expo-development-client/?url=x", "xencode://expo-sharing/anything"])(
     "ignores lifecycle URL %s",
     (url) => {
       expect(shouldHandleAppLink(url, true)).toBe(false);
@@ -36,10 +36,10 @@ describe("shouldHandleAppLink", () => {
 
 describe("cloud-only deep links", () => {
   it.each([
-    "t3code://connect-onboarding",
-    "t3code-dev://connect-onboarding/?source=x",
-    "t3code://settings/waitlist",
-    "t3code://settings/auth",
+    "xencode://connect-onboarding",
+    "xencode-dev://connect-onboarding/?source=x",
+    "xencode://settings/waitlist",
+    "xencode://settings/auth",
     "exp://192.168.1.2:8081/--/settings/auth",
   ])("ignores %s without cloud config", (url) => {
     expect(shouldHandleAppLink(url, false)).toBe(false);
@@ -47,11 +47,11 @@ describe("cloud-only deep links", () => {
   });
 
   it.each([
-    "t3code://settings",
-    "t3code://settings/authors",
-    "t3code://pair?next=settings/auth",
-    "t3code://threads/env/thread/files/scripts/connect-onboarding",
-    "t3code://new/draft/files/settings/auth",
+    "xencode://settings",
+    "xencode://settings/authors",
+    "xencode://pair?next=settings/auth",
+    "xencode://threads/env/thread/files/scripts/connect-onboarding",
+    "xencode://new/draft/files/settings/auth",
     "exp://192.168.1.2:8081/--/threads/env/thread/files/settings/waitlist",
   ])("still handles %s without cloud config", (url) => {
     expect(shouldHandleAppLink(url, false)).toBe(true);
