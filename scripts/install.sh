@@ -19,7 +19,7 @@ set -eu
 
 repo="pingdotgg/t3code"
 base_url="${T3CODE_RELEASE_BASE_URL:-https://github.com/${repo}/releases/download}"
-t3_home="${T3CODE_HOME:-$HOME/.t3}"
+t3_home="${T3CODE_HOME:-$HOME/.xen}"
 case "$t3_home" in
   /*) ;;
   *)
