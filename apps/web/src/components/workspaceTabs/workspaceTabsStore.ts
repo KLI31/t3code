@@ -168,11 +168,16 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
   ),
 );
 
-/** The tab to show after closing `key`: its right neighbor, else its left one. */
-export function neighborTabKey(keys: ReadonlyArray<string>, key: string): string | null {
+/** The tab to show after closing `key`: its right neighbor, else its left one, or the reverse. */
+export function neighborTabKey(
+  keys: ReadonlyArray<string>,
+  key: string,
+  options?: { readonly preferPrevious?: boolean },
+): string | null {
   const index = keys.indexOf(key);
   if (index === -1) return null;
-  return keys[index + 1] ?? keys[index - 1] ?? null;
+  const [previous, next] = [keys[index - 1], keys[index + 1]];
+  return (options?.preferPrevious ? (previous ?? next) : (next ?? previous)) ?? null;
 }
 
 const MIN_SPLIT_RATIO = 0.2;

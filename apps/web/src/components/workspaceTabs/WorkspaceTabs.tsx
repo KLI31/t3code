@@ -175,6 +175,15 @@ type ThreadRename = {
   onCancelRename: () => void;
 };
 
+/** Whether a tab still renders; a gone thread or discarded draft keeps its key but shows nothing. */
+function isTabShown(tab: WorkspaceTab): boolean {
+  if (tab.kind === "thread") return readThreadShell(tab.threadRef) !== null;
+  if (tab.kind === "draft") {
+    return useComposerDraftStore.getState().getDraftSession(DraftId.make(tab.draftId)) !== null;
+  }
+  return true;
+}
+
 /** The tab key a file or terminal tab's thread is routed under: its thread, or its draft. */
 function surfaceOwnerKey(threadRef: ScopedThreadRef): string {
   const draftId = useComposerDraftStore.getState().getDraftIdByRef(threadRef);
@@ -359,9 +368,16 @@ export function WorkspaceTabs() {
   };
 
   const close = (key: string) => {
+    const tab = parseWorkspaceTab(key);
     if (key === activeKey) {
+      const shownKeys = keys.filter((open) => {
+        const openTab = parseWorkspaceTab(open);
+        return open === key || (openTab !== null && isTabShown(openTab));
+      });
       // The split pane's thread takes over the main pane when the main one closes.
-      const next = (splitShown && key === routedKey ? splitKey : null) ?? neighborTabKey(keys, key);
+      const next =
+        (splitShown && key === routedKey ? splitKey : null) ??
+        neighborTabKey(shownKeys, key, { preferPrevious: tab?.kind === "draft" });
       const nextTab = next ? parseWorkspaceTab(next) : null;
       if (next && nextTab) select(next, nextTab);
       else {
@@ -370,7 +386,6 @@ export function WorkspaceTabs() {
       }
     }
     // Thread and file tabs come back with the reopen shortcut. Closing a terminal tab ends its shell.
-    const tab = parseWorkspaceTab(key);
     if (tab?.kind === "terminal")
       terminalActions.closeTerminalSession(tab.terminalId, tab.threadRef);
     else if (tab?.kind === "thread" || tab?.kind === "file") {
