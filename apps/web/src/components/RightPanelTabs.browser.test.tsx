@@ -98,6 +98,7 @@ describe("RightPanelTabs", () => {
           onAddBrowser={noop}
           onAddBrowserInProfile={noop}
           onAddTerminal={noop}
+          onAddHistory={noop}
           onAddDiff={noop}
           onAddFiles={noop}
           onAddPullRequest={noop}

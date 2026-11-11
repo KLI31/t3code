@@ -12,7 +12,7 @@ import { selectThreadDiffPanelSelection, useDiffPanelStore } from "~/diffPanelSt
 import { GRAPH_CIRCLE_RADIUS, LANE_WIDTH, layoutGitGraph, rowGraph } from "~/lib/gitGraph";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { cn } from "~/lib/utils";
-import { selectActiveRightPanel, useRightPanelStore } from "~/rightPanelStore";
+import { useRightPanelStore } from "~/rightPanelStore";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { vcsEnvironment } from "~/state/vcs";
@@ -93,10 +93,8 @@ export function GitHistoryPanel({ threadRef, cwd }: { threadRef: ScopedThreadRef
   );
 
   const openCommit = (sha: string) => {
-    const panels = useRightPanelStore.getState();
-    const diffOpen = selectActiveRightPanel(panels.byThreadKey, threadRef) === "diff";
-    useDiffPanelStore.getState().selectCommit(threadRef, sha, !diffOpen);
-    panels.open(threadRef, "diff");
+    useDiffPanelStore.getState().selectCommit(threadRef, sha);
+    useRightPanelStore.getState().open(threadRef, "diff");
   };
 
   const head = state.commits.find((commit) => commit.head);
