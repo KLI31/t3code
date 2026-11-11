@@ -5,8 +5,11 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import * as commandPalette from "../commandPaletteBus";
 import * as newThread from "../hooks/useHandleNewThread";
 import * as settings from "../hooks/useSettings";
+import * as storage from "../hooks/useLocalStorage";
 import * as threadActions from "../lib/chatThreadActions";
 import * as entities from "../state/entities";
+import * as projectsState from "../state/projects";
+import { Atom } from "effect/reactivity";
 import type { Project } from "../types";
 import { installChatRouteCommands } from "./chatRouteCommands";
 import * as dispatcher from "./dispatcher";
@@ -39,6 +42,10 @@ describe("new thread commands", () => {
     using _projects = vi
       .spyOn(entities, "readProjects")
       .mockReturnValue([project("active"), project("idle")].slice(0, scenario.count));
+    using _ready = vi
+      .spyOn(projectsState, "defaultProjectFallbackReadyAtom")
+      .mockReturnValue(Atom.make(true));
+    using storedProject = vi.spyOn(storage, "getLocalStorageItem").mockReturnValue("local:active");
     using openPicker = vi.spyOn(commandPalette, "openCommandPalette").mockImplementation(() => {});
     using startLocal = vi.spyOn(threadActions, "startNewThreadFromContext").mockResolvedValue(true);
     const startInProject = vi.fn().mockResolvedValue(null);
@@ -55,6 +62,7 @@ describe("new thread commands", () => {
       stopPropagation: vi.fn(),
     } as unknown as KeyboardEvent;
 
+    storedProject.mockReturnValue("local:idle");
     commands[scenario.command]!(event);
 
     expect(openPicker.mock.calls.length > 0).toBe(scenario.starts === "picker");
@@ -64,5 +72,11 @@ describe("new thread commands", () => {
         : undefined,
     );
     expect(startLocal.mock.calls.length).toBe(scenario.starts === "local" ? 1 : 0);
+    if (scenario.starts === "local") {
+      expect(startLocal.mock.calls[0]![0].defaultProjectRef).toEqual({
+        environmentId: "local",
+        projectId: "idle",
+      });
+    }
   });
 });

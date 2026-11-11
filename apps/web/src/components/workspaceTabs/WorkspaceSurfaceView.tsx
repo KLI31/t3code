@@ -9,10 +9,7 @@ import { lazy, Suspense } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useProject, useQuietThreadShell } from "../../state/entities";
-import {
-  primaryServerAvailableEditorsAtom,
-  primaryServerKeybindingsAtom,
-} from "../../state/server";
+import { primaryServerKeybindingsAtom, serverEnvironment } from "../../state/server";
 import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
 import { PersistentThreadTerminalPanel } from "../PersistentThreadTerminals";
 import { useThreadTerminalActions } from "../terminal/useThreadTerminalActions";
@@ -61,7 +58,9 @@ export function useNewTerminalTab(): (() => void) | null {
 function FileTab({ threadRef, path }: { threadRef: ScopedThreadRef; path: string }) {
   const { project, workspaceRoot } = useThreadWorkspace(threadRef);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const availableEditors = useAtomValue(primaryServerAvailableEditorsAtom);
+  const availableEditors =
+    useAtomValue(serverEnvironment.configValueAtom(threadRef.environmentId))?.availableEditors ??
+    [];
   const showSurface = useWorkspaceTabsStore((state) => state.showSurface);
   const draftId = useComposerDraftStore((store) => store.getDraftIdByRef(threadRef));
   if (!project || !workspaceRoot) return null;
