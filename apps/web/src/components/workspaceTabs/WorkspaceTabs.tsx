@@ -30,6 +30,7 @@ import {
   type ReactNode,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -39,12 +40,13 @@ import { readLocalApi } from "../../localApi";
 import { useHandleNewThread } from "../../hooks/useHandleNewThread";
 import { readNewThreadProjectRef } from "../../shortcuts/chatRouteCommands";
 import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
-import { usePrimarySettings } from "../../hooks/useSettings";
+import { useClientSettings, usePrimarySettings } from "../../hooks/useSettings";
 import { resolveThreadActionProjectRef } from "../../lib/chatThreadActions";
 import { DraftId, useComposerDraftStore } from "../../composerDraftStore";
 import { resolveAppModelSelectionForInstance } from "../../modelSelection";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { cn } from "../../lib/utils";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useClosedViewStore } from "../../closedViewStore";
 import { openCommandPalette } from "../../commandPaletteBus";
 import { registerCommands } from "../../shortcuts/dispatcher";
@@ -70,11 +72,14 @@ import {
 } from "./workspaceTabsStore";
 
 const TAB_CLASS =
-  "group/tab relative flex h-7.5 min-w-0 max-w-56 flex-1 items-center rounded-md text-sm [-webkit-app-region:no-drag]";
+  "group/tab relative flex h-7.5 min-w-0 max-w-56 flex-1 items-center overflow-hidden rounded-md text-sm [-webkit-app-region:no-drag]";
 const TAB_BODY_CLASS =
   "flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-md pr-7 pl-2 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
 const TAB_DRAG_TYPE = "application/x-xen-workspace-tab";
 const ACTIVE_TAB_CLASS = "bg-foreground/10 text-foreground";
+const TAB_EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+// The negative margin folds in the nav's gap-0.5, so neighbors don't jump when the tab mounts or unmounts.
+const COLLAPSED_TAB_FRAME = { maxWidth: "0px", opacity: 0, marginRight: "-0.125rem" };
 const IDLE_TAB_CLASS =
   "bg-foreground/4 text-foreground opacity-65 hover:bg-foreground/7 hover:opacity-100";
 
@@ -84,6 +89,7 @@ type TabDragHandlers = Pick<
 >;
 
 function Tab({
+  tabKey,
   icon,
   label,
   active,
@@ -95,6 +101,7 @@ function Tab({
   titleInput,
   pinned,
 }: {
+  tabKey: string;
   icon: ReactNode;
   label: string;
   active: boolean;
@@ -111,6 +118,7 @@ function Tab({
   // The close button is a sibling, not a child, so assistive technology can reach it.
   return (
     <div
+      data-tab-key={tabKey}
       draggable={!titleInput}
       {...drag}
       className={cn(TAB_CLASS, active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS)}
@@ -160,6 +168,7 @@ function Tab({
 }
 
 type TabProps = {
+  tabKey: string;
   active: boolean;
   onSelect: () => void;
   onClose: () => void;
@@ -182,6 +191,13 @@ function isTabShown(tab: WorkspaceTab): boolean {
     return useComposerDraftStore.getState().getDraftSession(DraftId.make(tab.draftId)) !== null;
   }
   return true;
+}
+
+function findTabElement(nav: HTMLElement | null, key: string): HTMLElement | undefined {
+  return Array.from(nav?.children ?? []).find(
+    (element): element is HTMLElement =>
+      element instanceof HTMLElement && element.dataset.tabKey === key,
+  );
 }
 
 /** The tab key a file or terminal tab's thread is routed under: its thread, or its draft. */
@@ -304,6 +320,14 @@ export function WorkspaceTabs() {
   const togglePin = useWorkspaceTabsStore((state) => state.togglePin);
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const draggingKeyRef = useRef<string | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const previousKeysRef = useRef<ReadonlyArray<string> | null>(null);
+  // Tabs playing their exit; they stay in the store until it ends.
+  const closingKeysRef = useRef(new Set<string>());
+  // Not usePanelAnimationSettings: it pauses on every route change, and opening a tab is one.
+  const tabAnimationMs = useClientSettings((settings) => settings.panelAnimationDurationMs);
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const tabAnimation = { active: tabAnimationMs > 0 && !reducedMotion, durationMs: tabAnimationMs };
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
@@ -340,6 +364,27 @@ export function WorkspaceTabs() {
     }
   }, [routedKey, openTab, closeTab, replaceTab, hideSurface]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- grows newly opened tab elements in with the Web Animations API before they first paint
+  useLayoutEffect(() => {
+    const previous = previousKeysRef.current;
+    previousKeysRef.current = keys;
+    if (!previous || !tabAnimation.active) return;
+    keys.forEach((key, index) => {
+      if (previous.includes(key)) return;
+      // A draft tab swapped for its sent thread keeps its place instead of growing in again.
+      const swapped = previous[index];
+      if (swapped !== undefined && !keys.includes(swapped)) return;
+      const element = findTabElement(navRef.current, key);
+      element?.animate(
+        [
+          COLLAPSED_TAB_FRAME,
+          { maxWidth: `${element.offsetWidth}px`, opacity: 1, marginRight: "0px" },
+        ],
+        { duration: tabAnimation.durationMs, easing: TAB_EASE },
+      );
+    });
+  }, [keys, tabAnimation.active, tabAnimation.durationMs]);
+
   const showThread = useShowThreadInMain();
   const splitShown = splitKey !== null && splitKey !== routedKey;
 
@@ -368,11 +413,15 @@ export function WorkspaceTabs() {
   };
 
   const close = (key: string) => {
+    if (closingKeysRef.current.has(key)) return;
     const tab = parseWorkspaceTab(key);
     if (key === activeKey) {
       const shownKeys = keys.filter((open) => {
         const openTab = parseWorkspaceTab(open);
-        return open === key || (openTab !== null && isTabShown(openTab));
+        return (
+          open === key ||
+          (openTab !== null && !closingKeysRef.current.has(open) && isTabShown(openTab))
+        );
       });
       // The split pane's thread takes over the main pane when the main one closes.
       const next =
@@ -393,7 +442,31 @@ export function WorkspaceTabs() {
         .getState()
         .remember({ kind: "workspace-tab", threadRef: tab.threadRef, key });
     }
-    closeTab(key);
+    const element = tabAnimation.active ? findTabElement(navRef.current, key) : undefined;
+    if (!element) {
+      closeTab(key);
+      return;
+    }
+    closingKeysRef.current.add(key);
+    element.inert = true;
+    const finish = () => {
+      closingKeysRef.current.delete(key);
+      closeTab(key);
+    };
+    // A cancelled exit, as when the tab bar unmounts, still closes the tab.
+    element
+      .animate(
+        [
+          { maxWidth: `${element.offsetWidth}px`, opacity: 1, marginRight: "0px" },
+          COLLAPSED_TAB_FRAME,
+        ],
+        {
+          duration: tabAnimation.durationMs,
+          easing: TAB_EASE,
+          fill: "forwards",
+        },
+      )
+      .finished.then(finish, finish);
   };
 
   const runTabShortcut = useEffectEvent((target: "next" | "previous" | "close" | number) => {
@@ -402,16 +475,17 @@ export function WorkspaceTabs() {
       close(activeKey);
       return;
     }
-    const index = activeKey ? keys.indexOf(activeKey) : -1;
+    const shownKeys = keys.filter((key) => !closingKeysRef.current.has(key));
+    const index = activeKey ? shownKeys.indexOf(activeKey) : -1;
     const nextKey =
       target === "next"
-        ? keys[(index + 1) % keys.length]
+        ? shownKeys[(index + 1) % shownKeys.length]
         : target === "previous"
-          ? keys[(index - 1 + keys.length) % keys.length]
+          ? shownKeys[(index - 1 + shownKeys.length) % shownKeys.length]
           : // The ninth jump goes to the last tab, as in browsers.
             target === 9
-            ? keys.at(-1)
-            : keys[target - 1];
+            ? shownKeys.at(-1)
+            : shownKeys[target - 1];
     const nextTab = nextKey ? parseWorkspaceTab(nextKey) : null;
     if (!nextKey || !nextTab) return false;
     select(nextKey, nextTab);
@@ -555,6 +629,7 @@ export function WorkspaceTabs() {
 
   return (
     <nav
+      ref={navRef}
       className={cn(
         // Same height as the fixed sidebar and panel controls, so their icons line up with the tabs.
         "hidden h-(--workspace-topbar-height) shrink-0 items-center gap-0.5 overflow-x-auto pr-(--workspace-tabs-end-inset) pl-1.5 md:flex",
@@ -569,6 +644,7 @@ export function WorkspaceTabs() {
         return (
           <WorkspaceTabButton
             key={key}
+            tabKey={key}
             tab={tab}
             active={key === activeKey || (splitShown && key === splitKey)}
             onSelect={() => select(key, tab)}
