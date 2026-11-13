@@ -118,9 +118,12 @@ export const getPreferredSystemLanguages = DesktopIpc.makeSyncIpcMethod({
 export const getWindowFullscreenState = DesktopIpc.makeSyncIpcMethod({
   channel: IpcChannels.GET_WINDOW_FULLSCREEN_STATE_CHANNEL,
   result: Schema.Boolean,
-  handler: Effect.fn("desktop.ipc.window.getWindowFullscreenState")(function* () {
+  handler: Effect.fn("desktop.ipc.window.getWindowFullscreenState")(function* (event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const window = yield* electronWindow.currentMainOrFirst;
+    const window =
+      event === undefined
+        ? yield* electronWindow.currentMainOrFirst
+        : yield* electronWindow.fromSender(event.sender.id);
     return Option.isSome(window) && window.value.isFullScreen();
   }),
 });
@@ -335,13 +338,11 @@ export const readMedia = DesktopIpc.makeIpcMethod({
   payload: Schema.String,
   result: Schema.NullOr(DesktopMediaReadSchema),
   handler: Effect.fn("desktop.ipc.window.readMedia")(function* (url, event) {
-    const window = yield* (yield* ElectronWindow.ElectronWindow).main;
-    if (
-      event === undefined ||
-      Option.isNone(window) ||
-      window.value.webContents.id !== event.sender.id ||
-      !/^https?:$/.test(URL.parse(url)?.protocol ?? "")
-    ) {
+    const window =
+      event === undefined
+        ? Option.none<Electron.BrowserWindow>()
+        : yield* (yield* ElectronWindow.ElectronWindow).fromSender(event.sender.id);
+    if (Option.isNone(window) || !/^https?:$/.test(URL.parse(url)?.protocol ?? "")) {
       return null;
     }
     const session = window.value.webContents.session;
@@ -413,15 +414,11 @@ export const pasteAsText = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.window.pasteAsText")(function* (_input, event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const window = yield* electronWindow.main;
-    if (
-      event === undefined ||
-      Option.isNone(window) ||
-      window.value.isDestroyed() ||
-      window.value.webContents.id !== event.sender.id
-    ) {
-      return;
-    }
+    const window =
+      event === undefined
+        ? Option.none<Electron.BrowserWindow>()
+        : yield* electronWindow.fromSender(event.sender.id);
+    if (Option.isNone(window)) return;
     const focused = Electron.webContents.getFocusedWebContents();
     if (
       focused &&
@@ -439,14 +436,11 @@ export const revealWindow = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.window.revealWindow")(function* (_input, event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const window = yield* electronWindow.main;
-    if (
-      event === undefined ||
-      Option.isNone(window) ||
-      window.value.webContents.id !== event.sender.id
-    ) {
-      return;
-    }
+    const window =
+      event === undefined
+        ? Option.none<Electron.BrowserWindow>()
+        : yield* electronWindow.fromSender(event.sender.id);
+    if (Option.isNone(window)) return;
     yield* electronWindow.reveal(window.value);
   }),
 });
@@ -469,7 +463,7 @@ const htmlFullscreenState = (window: Electron.BrowserWindow) => {
   return state;
 };
 
-// The main window keeps HTML fullscreen inside itself so preview guests stay in their webview,
+// An app window keeps HTML fullscreen inside itself so preview guests stay in their webview,
 // so the app's own fullscreen elements, such as chat videos, take the screen here.
 export const syncHtmlFullscreen = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.SYNC_HTML_FULLSCREEN_CHANNEL,
@@ -477,16 +471,12 @@ export const syncHtmlFullscreen = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.window.syncHtmlFullscreen")(function* (fullscreen, event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const main = yield* electronWindow.main;
-    if (
-      event === undefined ||
-      Option.isNone(main) ||
-      main.value.isDestroyed() ||
-      main.value.webContents.id !== event.sender.id
-    ) {
-      return;
-    }
-    const window = main.value;
+    const sender =
+      event === undefined
+        ? Option.none<Electron.BrowserWindow>()
+        : yield* electronWindow.fromSender(event.sender.id);
+    if (Option.isNone(sender)) return;
+    const window = sender.value;
     const state = htmlFullscreenState(window);
     if (fullscreen) {
       // macOS reports fullscreen until its exit animation ends, and Electron queues the re-entry.

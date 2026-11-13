@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { assert, it } from "@effect/vitest";
 import { vi } from "vite-plus/test";
@@ -9,9 +10,14 @@ vi.mock("electron", () => ({}));
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
 
-it.effect("answers only the main window's top frame", () =>
+it.effect("answers only app windows' top frames", () =>
   Effect.gen(function* () {
     const mainFrame = {};
+    const secondFrame = {};
+    const appWindows = [
+      { webContents: { id: 1, mainFrame } },
+      { webContents: { id: 3, mainFrame: secondFrame } },
+    ] as unknown as ReadonlyArray<Electron.BrowserWindow>;
     const invoke = new Map<string, DesktopIpc.DesktopIpcHandleListener>();
     const sync = new Map<string, DesktopIpc.DesktopIpcSyncListener>();
     const ipc = yield* DesktopIpc.DesktopIpc.pipe(
@@ -24,9 +30,12 @@ it.effect("answers only the main window's top frame", () =>
         }).pipe(
           Layer.provide(
             Layer.mock(ElectronWindow.ElectronWindow, {
-              main: Effect.succeedSome({
-                webContents: { id: 1, mainFrame },
-              } as unknown as Electron.BrowserWindow),
+              fromSender: (senderId) =>
+                Effect.succeed(
+                  Option.fromNullishOr(
+                    appWindows.find((window) => window.webContents.id === senderId),
+                  ),
+                ),
             }),
           ),
         ),
@@ -44,6 +53,7 @@ it.effect("answers only the main window's top frame", () =>
 
     const senders = {
       app: { sender: { id: 1 }, senderFrame: mainFrame },
+      secondWindow: { sender: { id: 3 }, senderFrame: secondFrame },
       appSubframe: { sender: { id: 1 }, senderFrame: {} },
       previewGuest: { sender: { id: 2 }, senderFrame: {} },
     };
@@ -60,6 +70,7 @@ it.effect("answers only the main window's top frame", () =>
     }
     assert.deepEqual(results, {
       app: ["secret", "secret"],
+      secondWindow: ["secret", "secret"],
       appSubframe: ["rejected", undefined],
       previewGuest: ["rejected", undefined],
     });

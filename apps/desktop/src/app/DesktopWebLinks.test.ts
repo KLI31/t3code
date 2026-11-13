@@ -3,6 +3,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as NodeEvents from "node:events";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 
 import * as DesktopWindow from "../window/DesktopWindow.ts";
@@ -84,6 +85,48 @@ describe("DesktopWebLinks", () => {
 
       yield* webLinks.setRendererReady(true);
       assert.deepStrictEqual(sent, ["https://example.com/during-reload"]);
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("keeps delivering to the window that stays open when another one closes", () => {
+    const first = makeWindow();
+    const second = makeWindow();
+    const windows = [first, second].map(
+      ({ sent }, index) =>
+        ({
+          webContents: Object.assign(new NodeEvents.EventEmitter(), {
+            id: index + 1,
+            isDestroyed: () => false,
+            send: (_channel: string, payload: string) => void sent.push(payload),
+          }),
+        }) as unknown as Electron.BrowserWindow,
+    );
+    let focused = windows[1]!;
+    const layer = DesktopWebLinks.layer.pipe(
+      Layer.provide(
+        Layer.succeed(DesktopWindow.DesktopWindow, {
+          activate: Effect.void,
+        } as unknown as DesktopWindow.DesktopWindow["Service"]),
+      ),
+      Layer.provide(
+        Layer.succeed(ElectronWindow.ElectronWindow, {
+          currentMainOrFirst: Effect.sync(() => Option.some(focused)),
+          fromSender: (id: number) =>
+            Effect.succeed(Option.fromNullishOr(windows.find((w) => w.webContents.id === id))),
+        } as unknown as ElectronWindow.ElectronWindow["Service"]),
+      ),
+    );
+    return Effect.gen(function* () {
+      const webLinks = yield* DesktopWebLinks.DesktopWebLinks;
+      yield* webLinks.setRendererReady(true, 1);
+      yield* webLinks.setRendererReady(true, 2);
+      yield* webLinks.receive("https://example.com/focused");
+      assert.deepStrictEqual(second.sent, ["https://example.com/focused"]);
+
+      windows[1]!.webContents.emit("destroyed");
+      focused = windows[0]!;
+      yield* webLinks.receive("https://example.com/survivor");
+      assert.deepStrictEqual(first.sent, ["https://example.com/survivor"]);
     }).pipe(Effect.provide(layer));
   });
 });

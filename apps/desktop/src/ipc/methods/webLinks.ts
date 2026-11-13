@@ -9,8 +9,8 @@ export const setReady = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.WEB_LINK_READY_CHANNEL,
   payload: Schema.Boolean,
   result: Schema.Void,
-  handler: Effect.fn("desktop.ipc.webLinks.setReady")(function* (ready) {
+  handler: Effect.fn("desktop.ipc.webLinks.setReady")(function* (ready, event) {
     const webLinks = yield* DesktopWebLinks.DesktopWebLinks;
-    yield* webLinks.setRendererReady(ready);
+    yield* webLinks.setRendererReady(ready, event?.sender.id);
   }),
 });

@@ -287,7 +287,8 @@ export class DesktopAppActivation extends Context.Service<
   DesktopAppActivation,
   {
     readonly start: Effect.Effect<void, DesktopAppActivationStartError, Scope.Scope>;
-    readonly setRendererReady: (ready: boolean) => Effect.Effect<void>;
+    /** `senderId` names the app window's renderer; without it, the main window's. */
+    readonly setRendererReady: (ready: boolean, senderId?: number) => Effect.Effect<void>;
     readonly complete: (response: DesktopAppActivationResponse) => Effect.Effect<void>;
   }
 >()("@t3tools/desktop/app/DesktopAppActivation") {}
@@ -309,8 +310,8 @@ export const make = Effect.gen(function* () {
     userId,
     joinPath: path.join,
   });
-  let registeredWebContents: Electron.WebContents | null = null;
-  let detachRendererListeners: (() => void) | null = null;
+  // Ready app-window renderers, oldest first, each with its listener cleanup.
+  const readyRenderers = new Map<Electron.WebContents, () => void>();
 
   const broker = new DesktopAppActivationBroker({
     requestTimeoutMs: REQUEST_TIMEOUT_MS,
@@ -323,11 +324,22 @@ export const make = Effect.gen(function* () {
     },
   });
 
-  const clearRegisteredRenderer = () => {
-    detachRendererListeners?.();
-    detachRendererListeners = null;
-    registeredWebContents = null;
-    broker.clearRenderer();
+  // Requests go to the renderer that became ready last; it falls back to the others as they close.
+  const registerLatestRenderer = () => {
+    const webContents = [...readyRenderers.keys()].at(-1);
+    if (webContents === undefined) {
+      broker.clearRenderer();
+      return;
+    }
+    broker.registerRenderer((request) => {
+      webContents.send(DESKTOP_APP_ACTIVATION_REQUEST_CHANNEL, request);
+    });
+  };
+
+  const dropRenderer = (webContents: Electron.WebContents) => {
+    readyRenderers.get(webContents)?.();
+    readyRenderers.delete(webContents);
+    registerLatestRenderer();
   };
 
   return DesktopAppActivation.of({
@@ -354,37 +366,40 @@ export const make = Effect.gen(function* () {
           Effect.ensuring(Effect.sync(() => broker.close())),
         ),
     ).pipe(Effect.asVoid),
-    setRendererReady: Effect.fn("DesktopAppActivation.setRendererReady")(function* (ready) {
-      if (!ready) {
-        clearRegisteredRenderer();
-        return;
-      }
-      const main = yield* electronWindow.main;
-      if (Option.isNone(main)) return;
-      const webContents = main.value.webContents;
-      if (webContents.isDestroyed()) return;
+    setRendererReady: Effect.fn("DesktopAppActivation.setRendererReady")(
+      function* (ready, senderId) {
+        const window =
+          senderId === undefined
+            ? yield* electronWindow.main
+            : yield* electronWindow.fromSender(senderId);
+        if (Option.isNone(window)) return;
+        const webContents = window.value.webContents;
+        if (!ready || webContents.isDestroyed()) {
+          dropRenderer(webContents);
+          return;
+        }
 
-      if (registeredWebContents !== webContents) {
-        clearRegisteredRenderer();
-        registeredWebContents = webContents;
-        const onUnavailable = () => clearRegisteredRenderer();
-        const onNavigation = (
-          event: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>,
-        ) => {
-          if (event.isMainFrame && !event.isSameDocument) clearRegisteredRenderer();
-        };
-        webContents.on("did-start-navigation", onNavigation);
-        webContents.once("destroyed", onUnavailable);
-        detachRendererListeners = () => {
-          webContents.removeListener("did-start-navigation", onNavigation);
-          webContents.removeListener("destroyed", onUnavailable);
-        };
-      }
-
-      broker.registerRenderer((request) => {
-        webContents.send(DESKTOP_APP_ACTIVATION_REQUEST_CHANNEL, request);
-      });
-    }),
+        const detach = readyRenderers.get(webContents);
+        if (detach === undefined) {
+          const onUnavailable = () => dropRenderer(webContents);
+          const onNavigation = (
+            event: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>,
+          ) => {
+            if (event.isMainFrame && !event.isSameDocument) dropRenderer(webContents);
+          };
+          webContents.on("did-start-navigation", onNavigation);
+          webContents.once("destroyed", onUnavailable);
+          readyRenderers.set(webContents, () => {
+            webContents.removeListener("did-start-navigation", onNavigation);
+            webContents.removeListener("destroyed", onUnavailable);
+          });
+        } else {
+          readyRenderers.delete(webContents);
+          readyRenderers.set(webContents, detach);
+        }
+        registerLatestRenderer();
+      },
+    ),
     // The IPC handler owns the activation-completion span.
     complete: Effect.fnUntraced(function* (response) {
       return yield* Effect.sync(() => broker.complete(response));

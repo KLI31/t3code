@@ -58,6 +58,7 @@ const layerElectronApp = (calls: ElectronAppCalls) =>
         calls.setAboutPanelOptions.push(options);
       }),
     setAppUserModelId: () => Effect.void,
+    setUserTasks: () => Effect.void,
     getAppMetrics: Effect.succeed([]),
     setAsDefaultProtocolClient: () => Effect.succeed(true),
     setDesktopName: () => Effect.void,

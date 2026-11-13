@@ -2928,6 +2928,10 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           // Match Electron's WM_CLASS from setDesktopName so docks use this launcher.
           StartupWMClass: "io.github.kli31.XenCode",
         },
+        // Launching again reaches the running app as a second instance, which opens another window.
+        desktopActions: {
+          NewWindow: { Name: "New Window", Exec: "xencode --new-window" },
+        },
       },
     };
     buildConfig.deb = {

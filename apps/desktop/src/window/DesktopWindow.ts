@@ -83,6 +83,7 @@ const TITLEBAR_COLOR = "#01000000"; // #00000000 does not work correctly on Linu
 const TITLEBAR_LIGHT_SYMBOL_COLOR = "#1f2937";
 const TITLEBAR_DARK_SYMBOL_COLOR = "#f8fafc";
 const MAIN_WINDOW_BOUNDS_PERSIST_DEBOUNCE_MS = 500;
+const CASCADE_OFFSET_PX = 32;
 const DEVELOPMENT_LOAD_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000] as const;
 const RENDERER_RECOVERY_RELOAD_DELAY_MS = 500;
 const RENDERER_RECOVERY_MAX_ATTEMPTS = 3;
@@ -122,6 +123,8 @@ export class DesktopWindow extends Context.Service<
     readonly ensureMain: Effect.Effect<Electron.BrowserWindow, DesktopWindowError>;
     readonly revealOrCreateMain: Effect.Effect<Electron.BrowserWindow, DesktopWindowError>;
     readonly activate: Effect.Effect<void, DesktopWindowError>;
+    /** Opens another app window on the same backend, or activates the app while none can open yet. */
+    readonly openNewWindow: Effect.Effect<void, DesktopWindowError>;
     readonly createMainIfBackendReady: Effect.Effect<void, DesktopWindowError>;
     readonly showConnectingSplash: Effect.Effect<void>;
     readonly handleBackendReady: (httpBaseUrl: URL) => Effect.Effect<void, DesktopWindowError>;
@@ -361,7 +364,7 @@ export const make = Effect.gen(function* () {
   const revealMain = Effect.fn("desktop.window.revealMain")((window: Electron.BrowserWindow) =>
     Effect.suspend(() => pendingMainReveals.get(window) ?? electronWindow.reveal(window)),
   );
-  let flushMainWindowBounds: Effect.Effect<void> = Effect.void;
+  const flushWindowBounds = new WeakMap<Electron.BrowserWindow, Effect.Effect<void>>();
 
   const dismissConnectingSplash = Effect.gen(function* () {
     const splash = yield* Ref.getAndSet(splashWindowRef, Option.none());
@@ -396,10 +399,10 @@ export const make = Effect.gen(function* () {
     yield* previewManager.reapplyZoom();
   });
 
-  const createWindow = Effect.fn("desktop.window.createWindow")(function* (): Effect.fn.Return<
-    Option.Option<Electron.BrowserWindow>,
-    DesktopWindowError
-  > {
+  /** `cascadeFrom` opens an extra window just below and right of that one, instead of the saved spot. */
+  const createWindow = Effect.fn("desktop.window.createWindow")(function* (
+    cascadeFrom?: Electron.BrowserWindow,
+  ): Effect.fn.Return<Option.Option<Electron.BrowserWindow>, DesktopWindowError> {
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
     yield* previewManager.getBrowserSession();
     const applicationUrl = getDesktopUrl(environment.isDevelopment);
@@ -424,9 +427,26 @@ export const make = Effect.gen(function* () {
         : yield* logWindowWarning("failed to read connected displays; using defaults", {
             cause: displayBoundsResult.cause,
           }).pipe(Effect.as<readonly Electron.Rectangle[]>([]));
-    const initialBounds = resolveInitialMainWindowBounds(persistedBounds, displayBounds);
-    const restoredPersistedBounds = persistedBounds !== null && initialBounds === persistedBounds;
-    if (persistedBounds !== null && initialBounds === DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE) {
+    const cascadeBounds =
+      cascadeFrom && !cascadeFrom.isDestroyed()
+        ? (({ x, y, width, height }) => ({
+            x: x + CASCADE_OFFSET_PX,
+            y: y + CASCADE_OFFSET_PX,
+            width,
+            height,
+          }))(cascadeFrom.getNormalBounds())
+        : null;
+    const initialBounds = resolveInitialMainWindowBounds(
+      cascadeBounds ?? persistedBounds,
+      displayBounds,
+    );
+    const restoredPersistedBounds =
+      cascadeBounds === null && persistedBounds !== null && initialBounds === persistedBounds;
+    if (
+      cascadeBounds === null &&
+      persistedBounds !== null &&
+      initialBounds === DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE
+    ) {
       yield* logWindowWarning("saved main window bounds could not be restored; using defaults");
     }
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
@@ -549,7 +569,7 @@ export const make = Effect.gen(function* () {
         fiber === undefined ? Effect.void : Fiber.join(fiber).pipe(Effect.asVoid),
       ),
     );
-    flushMainWindowBounds = flushBoundsPersist;
+    flushWindowBounds.set(window, flushBoundsPersist);
 
     yield* previewManager.setMainWindow(window);
     if (yield* Ref.get(desktopState.quitting)) {
@@ -911,7 +931,7 @@ export const make = Effect.gen(function* () {
       firstRevealComplete = true;
       pendingMainReveals.delete(window);
       window.webContents.setBackgroundThrottling(true);
-      if (persistedSettings.mainWindowMaximized) window.maximize();
+      if (persistedSettings.mainWindowMaximized && cascadeBounds === null) window.maximize();
       yield* electronWindow.reveal(window);
       yield* dismissConnectingSplash;
     });
@@ -921,8 +941,9 @@ export const make = Effect.gen(function* () {
       void runPromise(revealWhenReady);
     });
 
-    // Desktop IPC only answers the main window, so register it before its renderer can call in.
+    // Desktop IPC only answers app windows, so register it before its renderer can call in.
     yield* electronWindow.setMain(window);
+    window.on("focus", () => void runPromise(electronWindow.setMain(window)));
     loadApplication();
     if (environment.isDevelopment) {
       window.webContents.openDevTools({ mode: "detach" });
@@ -1055,6 +1076,35 @@ export const make = Effect.gen(function* () {
     yield* dispatch;
   });
 
+  const activate = Effect.gen(function* () {
+    if (yield* Ref.get(desktopState.quitting)) return;
+    const existingWindow = yield* currentMainWindow;
+    if (Option.isSome(existingWindow)) {
+      yield* revealMain(existingWindow.value);
+      return;
+    }
+    if (mainClosedDuringStartup) {
+      yield* ensureMain;
+      return;
+    }
+    const backendReady = yield* Ref.get(backendReadyRef);
+    if (!backendReady) {
+      const splash = yield* Ref.get(splashWindowRef);
+      if (Option.isSome(splash)) {
+        yield* electronWindow.reveal(splash.value);
+        return;
+      }
+    }
+    yield* createMainIfBackendReady;
+  }).pipe(Effect.withSpan("desktop.window.activate"));
+
+  const openNewWindow = Effect.gen(function* () {
+    if (yield* Ref.get(desktopState.quitting)) return;
+    const from = yield* focusedMainWindow;
+    if (Option.isNone(from) || (yield* waitingForBackend)) return yield* activate;
+    yield* createWindow(from.value).pipe(mainWindowMutex.withPermits(1));
+  }).pipe(Effect.withSpan("desktop.window.openNewWindow"));
+
   return DesktopWindow.of({
     createMain: createMain.pipe(Effect.flatMap(requireWindow)),
     ensureMain: ensureMain.pipe(Effect.flatMap(requireWindow)),
@@ -1065,27 +1115,8 @@ export const make = Effect.gen(function* () {
         yield* electronWindow.prepareReveal(existingWindow.value);
       }
     }),
-    activate: Effect.gen(function* () {
-      if (yield* Ref.get(desktopState.quitting)) return;
-      const existingWindow = yield* currentMainWindow;
-      if (Option.isSome(existingWindow)) {
-        yield* revealMain(existingWindow.value);
-        return;
-      }
-      if (mainClosedDuringStartup) {
-        yield* ensureMain;
-        return;
-      }
-      const backendReady = yield* Ref.get(backendReadyRef);
-      if (!backendReady) {
-        const splash = yield* Ref.get(splashWindowRef);
-        if (Option.isSome(splash)) {
-          yield* electronWindow.reveal(splash.value);
-          return;
-        }
-      }
-      yield* createMainIfBackendReady;
-    }).pipe(Effect.withSpan("desktop.window.activate")),
+    activate,
+    openNewWindow,
     createMainIfBackendReady,
     showConnectingSplash,
     handleBackendReady: Effect.fn("desktop.window.handleBackendReady")(function* (httpBaseUrl) {
@@ -1097,7 +1128,10 @@ export const make = Effect.gen(function* () {
     handleBackendNotReady: Ref.set(backendReadyRef, false).pipe(
       Effect.withSpan("desktop.window.handleBackendNotReady"),
     ),
-    flushMainWindowBounds: Effect.suspend(() => flushMainWindowBounds).pipe(
+    flushMainWindowBounds: electronWindow.main.pipe(
+      Effect.flatMap((main) =>
+        Option.isSome(main) ? (flushWindowBounds.get(main.value) ?? Effect.void) : Effect.void,
+      ),
       Effect.withSpan("desktop.window.flushMainWindowBounds"),
     ),
     dispatchMenuAction: Effect.fn("desktop.window.dispatchMenuAction")(function* (action, options) {

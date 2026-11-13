@@ -122,6 +122,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     main: Effect.succeedNone,
     currentMainOrFirst: Effect.succeedNone,
     focusedMainOrFirst: Effect.succeedNone,
+    fromSender: () => Effect.succeedNone,
     setMain: () => Effect.void,
     clearMain: () => Effect.void,
     prepareReveal: () => Effect.succeed(false),

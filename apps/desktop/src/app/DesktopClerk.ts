@@ -23,6 +23,7 @@ import * as DesktopUserData from "./DesktopUserData.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import { openClerkTokenStorage } from "./ClerkTokenStore.ts";
 import * as DesktopWebLinks from "./DesktopWebLinks.ts";
+import * as DesktopWindow from "../window/DesktopWindow.ts";
 
 declare const __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: string | undefined;
 
@@ -61,6 +62,7 @@ export class DesktopClerk extends Context.Service<
       | ElectronApp.ElectronApp
       | ElectronWindow.ElectronWindow
       | DesktopWebLinks.DesktopWebLinks
+      | DesktopWindow.DesktopWindow
       | Scope.Scope
     >;
   }
@@ -167,6 +169,7 @@ export const make = Effect.gen(function* () {
       const electronApp = yield* ElectronApp.ElectronApp;
       const electronWindow = yield* ElectronWindow.ElectronWindow;
       const webLinks = yield* DesktopWebLinks.DesktopWebLinks;
+      const desktopWindow = yield* DesktopWindow.DesktopWindow;
       const context = yield* Effect.context<ElectronWindow.ElectronWindow>();
       const runPromise = Effect.runPromiseWith(context);
 
@@ -246,11 +249,11 @@ export const make = Effect.gen(function* () {
           )
         )
           return;
+        // Launching the app again opens another window, as in VS Code.
         void runPromise(
-          Effect.gen(function* () {
-            const mainWindow = yield* electronWindow.currentMainOrFirst;
-            if (Option.isSome(mainWindow)) yield* electronWindow.reveal(mainWindow.value);
-          }),
+          desktopWindow.openNewWindow.pipe(
+            Effect.catchCause((cause) => Effect.logWarning("Could not open a new window", cause)),
+          ),
         );
       };
       for (const argv of pendingSecondInstances.splice(0)) handleSecondInstance(argv);

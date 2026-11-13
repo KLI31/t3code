@@ -4,6 +4,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import type * as Electron from "electron";
 import { beforeEach, vi } from "vite-plus/test";
 
@@ -192,6 +193,39 @@ describe("ElectronWindow", () => {
       getAllWindowsMock.mockReturnValue([auxiliary, ordinary]);
       const current = yield* electronWindow.currentMainOrFirst;
       assert.isTrue(current._tag === "Some" && current.value === ordinary);
+    }).pipe(Effect.provide(layerTest)),
+  );
+
+  it.effect("treats the last focused live app window as main and finds windows by sender", () =>
+    Effect.gen(function* () {
+      const electronWindow = yield* ElectronWindow.ElectronWindow;
+      const appWindow = (id: number) => {
+        let destroyed = false;
+        return Object.assign(
+          { isDestroyed: () => destroyed, webContents: { id } },
+          { destroy: () => (destroyed = true) },
+        ) as unknown as Electron.BrowserWindow & { destroy: () => void };
+      };
+      const first = appWindow(1);
+      const second = appWindow(2);
+      const mainId = Effect.map(electronWindow.main, (main) =>
+        main._tag === "Some" ? main.value.webContents.id : null,
+      );
+
+      yield* electronWindow.setMain(first);
+      yield* electronWindow.setMain(second);
+      assert.equal(yield* mainId, 2);
+      yield* electronWindow.setMain(first);
+      assert.equal(yield* mainId, 1);
+
+      const sender = yield* electronWindow.fromSender(2);
+      assert.isTrue(sender._tag === "Some" && sender.value === second);
+      assert.isTrue((yield* electronWindow.fromSender(99))._tag === "None");
+
+      first.destroy();
+      assert.equal(yield* mainId, 2);
+      yield* electronWindow.clearMain(Option.some(second));
+      assert.isNull(yield* mainId);
     }).pipe(Effect.provide(layerTest)),
   );
 });

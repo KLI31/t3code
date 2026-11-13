@@ -94,9 +94,11 @@ const closeTab = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.PREVIEW_CLOSE_TAB_CHANNEL,
   payload: DesktopPreviewTabInputSchema,
   result: Schema.Void,
-  handler: Effect.fn("desktop.ipc.preview.closeTab")(function* ({ tabId }) {
+  handler: Effect.fn("desktop.ipc.preview.closeTab")(function* ({ tabId }, event) {
     const manager = yield* PreviewManager.PreviewManager;
-    yield* manager.closeTab(tabId);
+    yield* event === undefined
+      ? manager.closeTab(tabId)
+      : manager.closeTabFromSender(tabId, event.sender.id);
   }),
 });
 
