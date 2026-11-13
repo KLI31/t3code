@@ -119,7 +119,15 @@ export function WorkspaceSplit({ children }: { children: ReactNode }) {
               )}
             />
           </div>
-          <div className="hidden min-h-0 min-w-0 basis-0 grow-[calc(1_-_var(--split-ratio))] flex-col md:flex">
+          {/* Enters on opacity and transform only, so neither chat lays out again per frame. */}
+          <div
+            className={cn(
+              "hidden min-h-0 min-w-0 basis-0 grow-[calc(1_-_var(--split-ratio))] flex-col md:flex",
+              vertical
+                ? "[[data-panel-animations=true]_&]:motion-safe:animate-split-pane-in-y"
+                : "[[data-panel-animations=true]_&]:motion-safe:animate-split-pane-in-x",
+            )}
+          >
             <WorkspaceSplitPane splitKey={shown.key} />
           </div>
         </>

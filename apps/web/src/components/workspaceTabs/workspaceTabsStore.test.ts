@@ -42,7 +42,14 @@ describe("parseWorkspaceTab", () => {
 });
 
 function setup() {
-  useWorkspaceTabsStore.setState({ keys: ["a", "b"], pinned: [], surfaceKey: null, split: null });
+  useWorkspaceTabsStore.setState({
+    keys: ["a", "b"],
+    pinned: [],
+    surfaceKey: null,
+    split: null,
+    groups: [],
+    tabGroup: {},
+  });
   return useWorkspaceTabsStore.getState();
 }
 
@@ -90,6 +97,51 @@ describe("workspace tabs", () => {
     store.togglePin("c");
     expect(useWorkspaceTabsStore.getState().keys.slice(0, 2)).toEqual(["b-thread", "c"]);
     expect(useWorkspaceTabsStore.getState().pinned).toEqual(["b-thread"]);
+  });
+});
+
+describe("tab groups", () => {
+  const state = () => useWorkspaceTabsStore.getState();
+
+  it("keeps a group's tabs together as tabs join, leave, and get dragged", () => {
+    const store = setup();
+    store.open("c");
+    store.open("d");
+    const group = store.createGroup("a")!;
+    store.addToGroup("c", group);
+    expect(state()).toMatchObject({ keys: ["a", "c", "b", "d"], tabGroup: { a: group, c: group } });
+
+    // Dragged onto a member it joins; dragged onto an outsider it leaves.
+    store.move("d", "a");
+    expect(state()).toMatchObject({ keys: ["d", "a", "c", "b"], tabGroup: { d: group } });
+    store.move("d", "b");
+    expect(state().keys).toEqual(["a", "c", "b", "d"]);
+    expect(state().tabGroup.d).toBeUndefined();
+
+    // Leaving from the middle steps past the rest of the group.
+    store.addToGroup("b", group);
+    store.removeFromGroup("a");
+    expect(state()).toMatchObject({ keys: ["c", "b", "a", "d"], tabGroup: { c: group, b: group } });
+
+    // A new group taken from a member's tab moves it out past its old group.
+    const other = store.createGroup("c")!;
+    expect(state()).toMatchObject({ keys: ["b", "c", "a", "d"], tabGroup: { b: group, c: other } });
+  });
+
+  it("drops a group once closing, pinning, or ungrouping empties it", () => {
+    const store = setup();
+    const group = store.createGroup("a")!;
+    store.addToGroup("b", group);
+    store.close("a");
+    store.togglePin("b");
+    expect(state()).toMatchObject({ groups: [], tabGroup: {} });
+
+    const next = store.createGroup("b")!;
+    expect(state().pinned).toEqual([]);
+    store.replace("b", "b-thread");
+    expect(state().tabGroup).toEqual({ "b-thread": next });
+    store.ungroup(next);
+    expect(state()).toMatchObject({ groups: [], tabGroup: {} });
   });
 });
 

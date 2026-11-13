@@ -45,6 +45,20 @@ html[data-mobile-composer-route-transition="true"]::view-transition-new(t3-mobil
 /* The expanded and compact composers have different internal layouts. Use a
    brief crossfade while their shared wrapper moves so the layout change does
    not read as a single-frame cut. */
+@keyframes split-pane-in-x {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes split-pane-in-y {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
 @keyframes t3-mobile-composer-old {
   0%,
   35% {
@@ -195,6 +209,10 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --inset-shadow-control-highlight: 0 1px rgb(255 255 255 / 16%);
   --inset-shadow-control-pressed: 0 1px rgb(0 0 0 / 8%);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Tailwind's ease-out is soft enough that panel slides read as lag; this one settles fast. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-split-pane-in-x: split-pane-in-x var(--panel-animation-duration) var(--ease-out);
+  --animate-split-pane-in-y: split-pane-in-y var(--panel-animation-duration) var(--ease-out);
   /* The composer's elevation: a soft drop pulled in under the surface, shared
      by the composer, its context strip and attached banners. */
   --shadow-composer: 0 1px 2px rgb(0 0 0 / 5%);

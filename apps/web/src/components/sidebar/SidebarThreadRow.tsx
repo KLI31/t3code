@@ -600,6 +600,7 @@ type SidebarThreadRowProps = {
 // Mounted only while renaming, so each rename starts uncommitted.
 export function ThreadRenameInput(props: {
   title: string;
+  ariaLabel?: string;
   onTitleChange: (title: string) => void;
   onCommit: () => void;
   onCancel: () => void;
@@ -624,7 +625,7 @@ export function ThreadRenameInput(props: {
       autoFocus
       value={props.title}
       dir="auto"
-      aria-label="Thread title"
+      aria-label={props.ariaLabel ?? "Thread title"}
       onChange={(event) => props.onTitleChange(event.target.value)}
       onFocus={(event) => event.currentTarget.select()}
       onKeyDown={handleKeyDown}
