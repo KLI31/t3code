@@ -6,7 +6,7 @@ Xen Code is a desktop control surface for the coding agents on your machine. It 
 
 Xen Code is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc., used under the [MIT License](./LICENSE). The architecture, the server, and the large majority of the code are their work. Xen Code is not affiliated with or endorsed by T3 Tools.
 
-## Installation
+It works with Claude Code, Codex, Cursor, OpenCode, Grok Build, Antigravity, Kiro, Pi, Muse Code, fx, and any [ACP](./docs/user/providers-acp.md) agent. If an agent is set up on your computer, T3 Code can control it.
 
 Install and authenticate at least one provider first:
 
