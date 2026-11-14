@@ -163,12 +163,12 @@ section is off. Each device keeps its own choice.
 
 ## Group tabs in the top bar
 
-Right-click a tab and choose **Add tab to new group** to start a group, or add it to an
+Right-click a tab and choose **Add to new group** to start a group, or add it to an
 existing group from the same menu. Click a group's label to collapse or expand it; the tab
 you are on stays visible either way. Right-click the label to rename the group, change its
-color, ungroup it, or close every tab in it. Dragging a tab onto a grouped tab moves it into
-that group, and dragging it out takes it out. Pinned tabs cannot be grouped. Each window and
-browser keeps its own tabs.
+color, ungroup it, or close every tab in it. Drag the label to move the whole group. Dragging
+a tab onto a grouped tab or onto the label moves it into that group, and dragging it out takes
+it out. Pinned tabs cannot be grouped. Each window and browser keeps its own tabs.
 
 On desktop, **File → New Window** (`mod+shift+n`) opens another window on the same threads.
 Launching the app again, or choosing **New Window** from its taskbar or launcher menu on
@@ -264,8 +264,8 @@ thread** from its long-press menu on mobile.
 keeps the provider's explanation. Retry after the limit resets, or switch to
 another provider instance.
 Press **Resume** in an empty composer to continue a limited or interrupted turn
-manually. Do this when the provider reports no reset time, because nothing
-continues the turn on its own.
+manually when the provider supports native continuation, or send a message to continue.
+Do this when the provider reports no reset time, because nothing continues the turn on its own.
 If another signed-in account of the same provider is configured as a provider
 instance, choose **Continue on <account>** to continue the turn there right away.
 Codex accounts set up with a shared home and a shadow home resume the same

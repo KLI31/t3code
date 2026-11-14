@@ -13,6 +13,7 @@ import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "rea
 import { isElectron } from "../../env";
 import { runConnectMcpApproval } from "../../state/connectMcpApproval";
 import { resolveClerkSignInProps } from "../clerk/authRedirect";
+import { retryClerkLoad, useClerkLoadFailed } from "../clerk/clerkLoadFailure";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
@@ -30,7 +31,7 @@ function readEnvironmentId(): EnvironmentId | null {
   return value ? EnvironmentId.make(value) : null;
 }
 
-/** Sends each call with the owner's T3 Connect session and remembers where the environment is. */
+/** Sends each call with the owner's Xen Connect session and remembers where the environment is. */
 function connectTransport(
   environmentId: EnvironmentId,
   onEnvironment: (environment: { readonly url: string; readonly label: string }) => void,
@@ -69,8 +70,8 @@ function connectTransport(
 }
 
 /**
- * The consent screen for an agent sign-in on a T3 Connect environment: the owner signs in to
- * T3 Connect here and approves with that session, so no sign-in code is needed.
+ * The consent screen for an agent sign-in on a Xen Connect environment: the owner signs in to
+ * Xen Connect here and approves with that session, so no sign-in code is needed.
  */
 export function ApproveAgentSurface() {
   const [environmentId] = useState(readEnvironmentId);
@@ -86,6 +87,7 @@ export function ApproveAgentSurface() {
   );
   const clerk = useClerk();
   const { isLoaded, isSignedIn } = useAuth();
+  const loadFailed = useClerkLoadFailed();
   const session = useAtomValue(managedRelaySessionAtom);
   const signInOpened = useRef(false);
 
@@ -118,12 +120,27 @@ export function ApproveAgentSurface() {
     );
   }
 
+  if (loadFailed) {
+    return (
+      <Message
+        title="Could not load sign-in"
+        description="Xen Connect sign-in did not load. Check your connection, then try again."
+      >
+        <div className="mt-6">
+          <Button type="button" onClick={retryClerkLoad}>
+            Retry sign-in
+          </Button>
+        </div>
+      </Message>
+    );
+  }
+
   if (!isLoaded || (isSignedIn && session === null)) {
     return (
       <StandalonePage>
         <StandalonePageHeader
           context="Agent sign-in"
-          title="Connecting to T3 Connect"
+          title="Connecting to Xen Connect"
           description="One moment while your account loads."
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
@@ -135,7 +152,7 @@ export function ApproveAgentSurface() {
     return (
       <Message
         title="Sign in to approve"
-        description="Sign in to T3 Connect with the account this environment is linked to."
+        description="Sign in to Xen Connect with the account this environment is linked to."
       >
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>

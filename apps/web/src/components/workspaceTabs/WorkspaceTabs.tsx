@@ -5,7 +5,6 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import {
   AuthOrchestrationOperateScope,
-  type ContextMenuItem,
   type ScopedThreadRef,
   TAB_JUMP_KEYBINDING_COMMANDS,
 } from "@t3tools/contracts";
@@ -23,6 +22,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
+import { useGT } from "gt-react";
 import {
   type DragEvent,
   type HTMLAttributes,
@@ -36,7 +36,6 @@ import {
 } from "react";
 
 import { isElectron } from "../../env";
-import { readLocalApi } from "../../localApi";
 import { useHandleNewThread } from "../../hooks/useHandleNewThread";
 import { readNewThreadProjectRef } from "../../shortcuts/chatRouteCommands";
 import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
@@ -63,13 +62,16 @@ import { useThreadTerminalActions } from "../terminal/useThreadTerminalActions";
 import { useShowThreadInMain } from "./WorkspaceSplit";
 import { useNewTerminalTab } from "./WorkspaceSurfaceView";
 import {
+  GROUP_COLOR_CLASS,
+  type TabMenuTarget,
+  useGroupLabel,
+  WorkspaceTabMenu,
+} from "./WorkspaceTabMenu";
+import {
   draftTabKey,
   neighborTabKey,
   parseWorkspaceTab,
-  TAB_GROUP_COLORS,
-  type TabGroupColor,
   useWorkspaceTabsStore,
-  type WorkspaceSplitDirection,
   type WorkspaceTab,
   type WorkspaceTabGroup,
 } from "./workspaceTabsStore";
@@ -83,23 +85,6 @@ const ACTIVE_TAB_CLASS = "bg-foreground/10 text-foreground";
 const TAB_EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 const IDLE_TAB_CLASS =
   "bg-foreground/4 text-foreground opacity-65 hover:bg-foreground/7 hover:opacity-100";
-// Full class strings so Tailwind sees them: the label's dot and the tinted box around the group.
-const GROUP_COLOR_CLASS: Record<TabGroupColor, { dot: string; box: string }> = {
-  grey: { dot: "bg-zinc-500", box: "bg-zinc-500/10 ring-zinc-500/30" },
-  blue: { dot: "bg-blue-500", box: "bg-blue-500/10 ring-blue-500/30" },
-  red: { dot: "bg-red-500", box: "bg-red-500/10 ring-red-500/30" },
-  yellow: { dot: "bg-amber-500", box: "bg-amber-500/10 ring-amber-500/30" },
-  green: { dot: "bg-green-500", box: "bg-green-500/10 ring-green-500/30" },
-  pink: { dot: "bg-pink-500", box: "bg-pink-500/10 ring-pink-500/30" },
-  purple: { dot: "bg-violet-500", box: "bg-violet-500/10 ring-violet-500/30" },
-  cyan: { dot: "bg-cyan-500", box: "bg-cyan-500/10 ring-cyan-500/30" },
-  orange: { dot: "bg-orange-500", box: "bg-orange-500/10 ring-orange-500/30" },
-};
-
-function groupLabel(group: WorkspaceTabGroup): string {
-  return group.title || `${group.color[0]!.toUpperCase()}${group.color.slice(1)} group`;
-}
-
 type TabDragHandlers = Pick<
   HTMLAttributes<HTMLDivElement>,
   "onDragStart" | "onDragEnter" | "onDragOver" | "onDragEnd" | "onDrop"
@@ -140,6 +125,7 @@ function Tab({
   folded?: boolean | undefined;
   animationMs: number;
 }) {
+  const gt = useGT();
   // The close button is a sibling, not a child, so assistive technology can reach it.
   return (
     <div
@@ -181,13 +167,13 @@ function Tab({
       {pinned ? (
         <PinIcon
           role="img"
-          aria-label="Pinned"
+          aria-label={gt("Pinned")}
           className="pointer-events-none absolute right-2 size-3 text-muted-foreground"
         />
       ) : (
         <button
           type="button"
-          aria-label={`Close ${label}`}
+          aria-label={gt("Close {label}", { label })}
           onClick={onClose}
           className={cn(
             "absolute right-1 grid size-5 place-items-center rounded-sm text-muted-foreground outline-hidden group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 hover:bg-foreground/10 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
@@ -309,11 +295,12 @@ function DraftTab({ draftId, ...props }: TabProps & { draftId: string }) {
   const exists = useComposerDraftStore(
     (store) => store.getDraftSession(DraftId.make(draftId)) !== null,
   );
+  const gt = useGT();
   if (!exists) return null;
   return (
     <Tab
       icon={<SquarePenIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
-      label="New thread"
+      label={gt("New thread")}
       {...props}
     />
   );
@@ -324,6 +311,7 @@ function WorkspaceTabButton({
   rename,
   ...props
 }: TabProps & { tab: WorkspaceTab; rename: ThreadRename }) {
+  const gt = useGT();
   switch (tab.kind) {
     case "thread":
       return <ThreadTab threadRef={tab.threadRef} rename={rename} {...props} />;
@@ -343,7 +331,7 @@ function WorkspaceTabButton({
           icon={
             <SquareTerminalIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
           }
-          label="Terminal"
+          label={gt("Terminal")}
           {...props}
         />
       );
@@ -358,6 +346,7 @@ function TabGroupLabel({
   onContextMenu,
   onCommitRename,
   onCancelRename,
+  drag,
 }: {
   group: WorkspaceTabGroup;
   tabCount: number;
@@ -366,7 +355,14 @@ function TabGroupLabel({
   onContextMenu: (event: MouseEvent) => void;
   onCommitRename: (title: string) => void;
   onCancelRename: () => void;
+  /** Dragging the label moves the whole group; dropping a tab on it adds the tab. */
+  drag: Pick<
+    HTMLAttributes<HTMLButtonElement>,
+    "onDragStart" | "onDragEnter" | "onDragOver" | "onDragEnd" | "onDrop"
+  >;
 }) {
+  const gt = useGT();
+  const groupLabel = useGroupLabel();
   const [title, setTitle] = useState<string | null>(null);
   const dot = (
     <span
@@ -380,7 +376,7 @@ function TabGroupLabel({
         {dot}
         <ThreadRenameInput
           title={title ?? group.title}
-          ariaLabel="Group name"
+          ariaLabel={gt("Group name")}
           onTitleChange={setTitle}
           onCommit={() => {
             setTitle(null);
@@ -398,10 +394,12 @@ function TabGroupLabel({
     <button
       type="button"
       aria-expanded={!group.collapsed}
-      aria-label={`${groupLabel(group)}, ${tabCount} ${tabCount === 1 ? "tab" : "tabs"}`}
+      aria-label={gt("{name}, {count} tabs", { name: groupLabel(group), count: tabCount })}
+      draggable
+      {...drag}
       onClick={onToggle}
       onContextMenu={onContextMenu}
-      className="flex h-6.5 max-w-36 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-foreground outline-hidden [-webkit-app-region:no-drag] hover:bg-foreground/7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      className="flex h-6.5 max-w-36 shrink-0 cursor-grab items-center gap-1.5 rounded-md px-2 text-sm font-medium text-foreground outline-hidden [-webkit-app-region:no-drag] hover:bg-foreground/7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:cursor-grabbing"
     >
       {dot}
       {group.title ? <span className="truncate">{group.title}</span> : null}
@@ -443,6 +441,12 @@ export function WorkspaceTabs() {
   // Where each tab and group label sat before a reorder, for sliding them to their new places.
   const flipFromRef = useRef<Map<string, number> | null>(null);
   const draggingKeyRef = useRef<string | null>(null);
+  const draggingGroupRef = useRef<string | null>(null);
+  const [menuTarget, setMenuTarget] = useState<TabMenuTarget | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const gt = useGT();
+  const groupLabel = useGroupLabel();
+  const moveGroup = useWorkspaceTabsStore((state) => state.moveGroup);
   const navRef = useRef<HTMLElement>(null);
   // Not usePanelAnimationSettings: it pauses on every route change, and opening a tab is one.
   const tabAnimationMs = useClientSettings((settings) => settings.panelAnimationDurationMs);
@@ -734,122 +738,134 @@ export function WorkspaceTabs() {
       event.dataTransfer.setData(TAB_DRAG_TYPE, key);
     },
     onDragEnter: (event: DragEvent) => {
-      const dragging = draggingKeyRef.current;
       // A tab still sliding into place passes under the pointer; reacting to it would bounce the drag.
-      if (!dragging || dragging === key || event.currentTarget.getAnimations().length > 0) return;
+      if (event.currentTarget.getAnimations().length > 0) return;
+      const draggingGroup = draggingGroupRef.current;
+      if (draggingGroup) {
+        if (tabGroup[key] === draggingGroup) return;
+        rememberPositions();
+        moveGroup(draggingGroup, key);
+        return;
+      }
+      const dragging = draggingKeyRef.current;
+      if (!dragging || dragging === key) return;
       rememberPositions();
       moveTab(dragging, key);
     },
     onDragOver: (event: DragEvent) => {
-      if (draggingKeyRef.current) event.preventDefault();
+      if (draggingKeyRef.current || draggingGroupRef.current) event.preventDefault();
     },
     onDrop: (event: DragEvent) => {
-      if (draggingKeyRef.current) event.preventDefault();
+      if (draggingKeyRef.current || draggingGroupRef.current) event.preventDefault();
     },
     onDragEnd: () => {
       draggingKeyRef.current = null;
     },
   });
 
-  const showTabMenu = (event: MouseEvent, key: string, tab: WorkspaceTab) => {
-    const api = readLocalApi();
-    if (!api) return;
+  const groupDragHandlers = (group: WorkspaceTabGroup) => ({
+    onDragStart: (event: DragEvent<HTMLButtonElement>) => {
+      draggingGroupRef.current = group.id;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(TAB_DRAG_TYPE, `group:${group.id}`);
+      // The whole box follows the pointer, not just its label.
+      const box = event.currentTarget.parentElement;
+      if (box) {
+        const rect = box.getBoundingClientRect();
+        event.dataTransfer.setDragImage(box, event.clientX - rect.left, event.clientY - rect.top);
+      }
+    },
+    onDragEnter: (event: DragEvent<HTMLButtonElement>) => {
+      if (event.currentTarget.parentElement?.getAnimations().length) return;
+      const draggingGroup = draggingGroupRef.current;
+      const first = keys.find((key) => tabGroup[key] === group.id);
+      if (draggingGroup && draggingGroup !== group.id && first) {
+        rememberPositions();
+        moveGroup(draggingGroup, first);
+        return;
+      }
+      const dragging = draggingKeyRef.current;
+      if (dragging && tabGroup[dragging] !== group.id && !pinnedKeys.includes(dragging)) {
+        rememberPositions();
+        addToGroup(dragging, group.id);
+      }
+    },
+    onDragOver: (event: DragEvent<HTMLButtonElement>) => {
+      if (draggingKeyRef.current || draggingGroupRef.current) event.preventDefault();
+    },
+    onDrop: (event: DragEvent<HTMLButtonElement>) => {
+      if (draggingKeyRef.current || draggingGroupRef.current) event.preventDefault();
+    },
+    onDragEnd: () => {
+      draggingGroupRef.current = null;
+    },
+  });
+
+  const openMenu = (event: MouseEvent, target: TabMenuTarget) => {
     event.preventDefault();
-    const inMain = key === routedKey;
-    const threadItems: ContextMenuItem<WorkspaceSplitDirection | "rename">[] =
-      tab.kind === "thread"
-        ? [
-            { id: "rename", label: "Rename", disabled: !canRename(tab.threadRef) },
-            { id: "right", label: "Split right", disabled: inMain, separatorBefore: true },
-            { id: "down", label: "Split down", disabled: inMain },
-          ]
-        : [];
-    const currentGroup = tabGroup[key];
-    const otherGroups = groups.filter((group) => group.id !== currentGroup);
-    const items: ContextMenuItem<
-      | WorkspaceSplitDirection
-      | "rename"
-      | "pin"
-      | "close-split"
-      | "close"
-      | "new-group"
-      | "leave-group"
-      | `group:${string}`
-    >[] = [
-      ...threadItems,
-      otherGroups.length > 0
-        ? {
-            id: "new-group",
-            label: "Add tab to group",
-            separatorBefore: threadItems.length > 0,
-            children: [
-              { id: "new-group", label: "New group" },
-              ...otherGroups.map((group, index) => ({
-                id: `group:${group.id}` as const,
-                label: groupLabel(group),
-                separatorBefore: index === 0,
-              })),
-            ],
-          }
-        : {
-            id: "new-group",
-            label: "Add tab to new group",
-            separatorBefore: threadItems.length > 0,
-          },
-      ...(currentGroup ? [{ id: "leave-group" as const, label: "Remove from group" }] : []),
-      { id: "pin", label: pinnedKeys.includes(key) ? "Unpin tab" : "Pin tab" },
-      ...(splitShown ? [{ id: "close-split" as const, label: "Close split" }] : []),
-      { id: "close", label: "Close tab", separatorBefore: true },
-    ];
-    void api.contextMenu.show(items, { x: event.clientX, y: event.clientY }).then((action) => {
-      if (action === "rename") setRenamingKey(key);
-      else if (action === "new-group") {
-        rememberPositions();
-        const groupId = createGroup(key);
-        if (groupId) setRenamingGroupId(groupId);
-      } else if (action === "leave-group") {
-        rememberPositions();
-        removeFromGroup(key);
-      } else if (action?.startsWith("group:")) {
-        rememberPositions();
-        addToGroup(key, action.slice("group:".length));
-      } else if (action === "pin") {
-        rememberPositions();
-        togglePin(key);
-      } else if (action === "right" || action === "down") openSplit(key, action);
-      else if (action === "close-split") closeSplit();
-      else if (action === "close") close(key);
-    });
+    setMenuTarget(target);
+    setMenuOpen(true);
   };
 
-  const showGroupMenu = (event: MouseEvent, group: WorkspaceTabGroup) => {
-    const api = readLocalApi();
-    if (!api) return;
-    event.preventDefault();
-    const items: ContextMenuItem<"rename" | "ungroup" | "close" | `color:${TabGroupColor}`>[] = [
-      { id: "rename", label: "Rename group" },
-      {
-        id: `color:${group.color}`,
-        label: "Color",
-        children: TAB_GROUP_COLORS.map((color) => ({
-          id: `color:${color}` as const,
-          label: `${color[0]!.toUpperCase()}${color.slice(1)}`,
-          checked: color === group.color,
-        })),
-      },
-      { id: "ungroup", label: "Ungroup", separatorBefore: true },
-      { id: "close", label: "Close group", destructive: true },
-    ];
-    void api.contextMenu.show(items, { x: event.clientX, y: event.clientY }).then((action) => {
-      if (action === "rename") setRenamingGroupId(group.id);
-      else if (action === "ungroup") ungroup(group.id);
-      else if (action === "close") closeTabs(keys.filter((key) => tabGroup[key] === group.id));
-      else if (action?.startsWith("color:")) {
-        const color = TAB_GROUP_COLORS.find((entry) => `color:${entry}` === action);
-        if (color) updateGroup(group.id, { color });
+  const menuKey = menuTarget?.kind === "tab" ? menuTarget.key : null;
+  const menuTab = menuKey ? parseWorkspaceTab(menuKey) : null;
+  const menuGroupId = menuTarget?.kind === "group" ? menuTarget.groupId : null;
+  const tabMenu = (
+    <WorkspaceTabMenu
+      target={menuTarget}
+      open={menuOpen}
+      onOpenChange={setMenuOpen}
+      tab={
+        menuKey && menuTab
+          ? {
+              thread:
+                menuTab.kind === "thread"
+                  ? { canRename: canRename(menuTab.threadRef), inMain: menuKey === routedKey }
+                  : null,
+              pinned: pinnedKeys.includes(menuKey),
+              groupId: tabGroup[menuKey] ?? null,
+            }
+          : null
       }
-    });
-  };
+      groups={groups}
+      splitShown={splitShown}
+      onRename={() => menuKey && setRenamingKey(menuKey)}
+      onSplit={(direction) => menuKey && openSplit(menuKey, direction)}
+      onNewGroup={() => {
+        if (!menuKey) return;
+        rememberPositions();
+        const groupId = createGroup(menuKey);
+        if (groupId) setRenamingGroupId(groupId);
+      }}
+      onAddToGroup={(groupId) => {
+        if (!menuKey) return;
+        rememberPositions();
+        addToGroup(menuKey, groupId);
+      }}
+      onLeaveGroup={() => {
+        if (!menuKey) return;
+        rememberPositions();
+        removeFromGroup(menuKey);
+      }}
+      onTogglePin={() => {
+        if (!menuKey) return;
+        rememberPositions();
+        togglePin(menuKey);
+      }}
+      onCloseSplit={closeSplit}
+      onClose={() => menuKey && close(menuKey)}
+      onRenameGroup={() => menuGroupId && setRenamingGroupId(menuGroupId)}
+      onToggleCollapsed={() => {
+        const group = menuGroupId ? groupById.get(menuGroupId) : undefined;
+        if (group) updateGroup(group.id, { collapsed: !group.collapsed });
+      }}
+      onSetColor={(color) => menuGroupId && updateGroup(menuGroupId, { color })}
+      onUngroup={() => menuGroupId && ungroup(menuGroupId)}
+      onCloseGroup={() =>
+        menuGroupId && closeTabs(keys.filter((key) => tabGroup[key] === menuGroupId))
+      }
+    />
+  );
 
   const settings = usePrimarySettings();
   const providers = useAtomValue(primaryServerProvidersAtom).filter(
@@ -896,7 +912,7 @@ export function WorkspaceTabs() {
         isElectron && "drag-region",
         COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
       )}
-      aria-label="Open tabs"
+      aria-label={gt("Open tabs")}
     >
       {segments.map((segment) => {
         const tabs = segment.keys.map((key) => {
@@ -925,7 +941,9 @@ export function WorkspaceTabs() {
                 onCancelRename: () => setRenamingKey(null),
               }}
               pinned={pinnedKeys.includes(key)}
-              onContextMenu={(event: MouseEvent) => showTabMenu(event, key, tab)}
+              onContextMenu={(event: MouseEvent) =>
+                openMenu(event, { kind: "tab", key, x: event.clientX, y: event.clientY })
+              }
             />
           );
         });
@@ -947,7 +965,15 @@ export function WorkspaceTabs() {
               tabCount={segment.keys.length}
               renaming={renamingGroupId === group.id}
               onToggle={() => updateGroup(group.id, { collapsed: !group.collapsed })}
-              onContextMenu={(event) => showGroupMenu(event, group)}
+              onContextMenu={(event) =>
+                openMenu(event, {
+                  kind: "group",
+                  groupId: group.id,
+                  x: event.clientX,
+                  y: event.clientY,
+                })
+              }
+              drag={groupDragHandlers(group)}
               onCommitRename={(title) => {
                 setRenamingGroupId(null);
                 updateGroup(group.id, { title: title.trim() });
@@ -964,7 +990,7 @@ export function WorkspaceTabs() {
             <button
               type="button"
               data-flip-key="new-tab"
-              aria-label="New tab"
+              aria-label={gt("New tab")}
               className="ml-0.5 grid size-7.5 shrink-0 place-items-center rounded-md bg-foreground/4 text-muted-foreground opacity-65 outline-hidden [-webkit-app-region:no-drag] hover:bg-foreground/7 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-popup-open:opacity-100"
             />
           }
@@ -974,15 +1000,15 @@ export function WorkspaceTabs() {
         <MenuPopup align="start" sideOffset={6} className="min-w-60">
           <MenuItem onClick={() => void startNewThread()}>
             <SquarePenIcon />
-            New thread
+            {gt("New thread")}
           </MenuItem>
           <MenuItem disabled={!newTerminalTab} onClick={() => newTerminalTab?.()}>
             <SquareTerminalIcon />
-            New terminal
+            {gt("New terminal")}
           </MenuItem>
           <MenuItem onClick={() => void navigate({ to: "/notes" })}>
             <NotebookTextIcon />
-            Notes
+            {gt("Notes")}
           </MenuItem>
           {providers.length > 0 ? <MenuSeparator /> : null}
           {providers.map((provider) => (
@@ -1002,10 +1028,11 @@ export function WorkspaceTabs() {
           <MenuSeparator />
           <MenuItem onClick={() => void navigate({ to: "/settings/providers" })}>
             <SettingsIcon />
-            Agent settings…
+            {gt("Agent settings…")}
           </MenuItem>
         </MenuPopup>
       </Menu>
+      {tabMenu}
     </nav>
   );
 }
