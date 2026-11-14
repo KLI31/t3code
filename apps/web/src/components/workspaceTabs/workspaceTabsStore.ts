@@ -3,6 +3,8 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { randomUUID } from "../../lib/utils";
+
 const MAX_TABS = 12;
 const SEPARATOR = "\u001f";
 
@@ -66,6 +68,63 @@ function withTab(
   return next;
 }
 
+export const TAB_GROUP_COLORS = [
+  "blue",
+  "red",
+  "yellow",
+  "green",
+  "pink",
+  "purple",
+  "cyan",
+  "orange",
+  "grey",
+] as const;
+export type TabGroupColor = (typeof TAB_GROUP_COLORS)[number];
+
+/** A named, colored run of adjacent unpinned tabs that can fold down to its label. */
+export interface WorkspaceTabGroup {
+  readonly id: string;
+  readonly title: string;
+  readonly color: TabGroupColor;
+  readonly collapsed: boolean;
+}
+
+type GroupFields = Pick<WorkspaceTabsState, "keys" | "pinned" | "tabGroup" | "groups">;
+
+/** `keys` with `key` moved to just after `anchor`. */
+function placeAfter(keys: ReadonlyArray<string>, key: string, anchor: string) {
+  const next = keys.filter((open) => open !== key);
+  next.splice(next.indexOf(anchor) + 1, 0, key);
+  return next;
+}
+
+/** Takes `key` out of its group, setting it just past the group's other tabs so the group stays one run. */
+function leaveGroup(state: GroupFields, key: string): Pick<GroupFields, "keys" | "tabGroup"> {
+  const groupId = state.tabGroup[key];
+  if (groupId === undefined) return state;
+  const { [key]: _left, ...tabGroup } = state.tabGroup;
+  const last = state.keys.findLast((open) => open !== key && state.tabGroup[open] === groupId);
+  return { keys: last ? placeAfter(state.keys, key, last) : state.keys, tabGroup };
+}
+
+/** Drops memberships of tabs that closed or got pinned, and groups left with no tabs. */
+function pruneGroups(state: GroupFields): Pick<GroupFields, "tabGroup" | "groups"> {
+  const tabGroup = Object.fromEntries(
+    Object.entries(state.tabGroup).filter(
+      ([key]) => state.keys.includes(key) && !state.pinned.includes(key),
+    ),
+  );
+  const used = new Set(Object.values(tabGroup));
+  const groups = state.groups.filter((group) => used.has(group.id));
+  return {
+    tabGroup:
+      Object.keys(tabGroup).length === Object.keys(state.tabGroup).length
+        ? state.tabGroup
+        : tabGroup,
+    groups: groups.length === state.groups.length ? state.groups : groups,
+  };
+}
+
 interface WorkspaceTabsState {
   /** Tab keys, left to right, pinned ones first. Per browser: each client keeps its own open set. */
   readonly keys: ReadonlyArray<string>;
@@ -73,6 +132,9 @@ interface WorkspaceTabsState {
   /** The open file or terminal tab shown over the routed thread, or null for the thread itself. */
   readonly surfaceKey: string | null;
   readonly split: WorkspaceSplit | null;
+  readonly groups: ReadonlyArray<WorkspaceTabGroup>;
+  /** Tab key to its group id. A group's tabs always sit next to each other in `keys`. */
+  readonly tabGroup: Readonly<Record<string, string>>;
   open: (key: string) => void;
   /** Opens a file or terminal tab and shows it. */
   showSurface: (key: string) => void;
@@ -88,82 +150,175 @@ interface WorkspaceTabsState {
   setSplitKey: (key: string) => void;
   setSplitRatio: (ratio: number) => void;
   closeSplit: () => void;
+  /** Starts a group holding `key`, unpinning it first. Returns the new group's id, or null if `key` is not open. */
+  createGroup: (key: string) => string | null;
+  /** Moves `key` to the end of the group. */
+  addToGroup: (key: string, groupId: string) => void;
+  removeFromGroup: (key: string) => void;
+  updateGroup: (
+    groupId: string,
+    patch: Partial<Pick<WorkspaceTabGroup, "title" | "color" | "collapsed">>,
+  ) => void;
+  /** Dissolves the group; its tabs stay open where they are. */
+  ungroup: (groupId: string) => void;
 }
 
 export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
   persist(
-    (set) => ({
-      keys: [],
-      pinned: [],
-      surfaceKey: null,
-      split: null,
-      open: (key) =>
-        set((state) =>
-          state.keys.includes(key) ? state : { keys: withTab(state.keys, state.pinned, key) },
-        ),
-      showSurface: (key) =>
-        set((state) => ({ surfaceKey: key, keys: withTab(state.keys, state.pinned, key) })),
-      hideSurface: () => set((state) => (state.surfaceKey === null ? state : { surfaceKey: null })),
-      close: (key) =>
-        set((state) => ({
-          keys: state.keys.filter((open) => open !== key),
-          pinned: state.pinned.filter((open) => open !== key),
-          surfaceKey: state.surfaceKey === key ? null : state.surfaceKey,
-          split: state.split?.key === key ? null : state.split,
-        })),
-      replace: (from, to) =>
-        set((state) => ({
-          keys: state.keys.includes(to)
-            ? state.keys.filter((open) => open !== from)
-            : state.keys.map((open) => (open === from ? to : open)),
-          pinned: state.pinned.includes(from)
-            ? [...state.pinned.filter((open) => open !== from && open !== to), to]
-            : state.pinned,
-          surfaceKey: state.surfaceKey === from ? null : state.surfaceKey,
-        })),
-      move: (from, to) =>
-        set((state) => {
-          const index = state.keys.indexOf(to);
-          if (from === to || index === -1 || !state.keys.includes(from)) return state;
-          if (state.pinned.includes(from) !== state.pinned.includes(to)) return state;
-          const keys = state.keys.filter((open) => open !== from);
-          keys.splice(index, 0, from);
-          return { keys };
-        }),
-      togglePin: (key) =>
-        set((state) => {
-          if (!state.keys.includes(key)) return state;
-          const pinned = state.pinned.includes(key)
-            ? state.pinned.filter((open) => open !== key)
-            : [...state.pinned, key];
-          const others = state.keys.filter((open) => open !== key);
-          // Either way the tab lands at the seam: last pinned, or first unpinned.
-          return {
-            pinned,
-            keys: [
-              ...others.filter((open) => pinned.includes(open)),
-              key,
-              ...others.filter((open) => !pinned.includes(open)),
-            ],
-          };
-        }),
-      openSplit: (key, direction) =>
-        set((state) => ({
-          keys: withTab(state.keys, state.pinned, key),
-          split: { key, direction, ratio: state.split?.ratio ?? 0.5 },
-        })),
-      setSplitKey: (key) =>
-        set((state) => (state.split ? { split: { ...state.split, key } } : state)),
-      setSplitRatio: (ratio) =>
-        set((state) =>
-          state.split ? { split: { ...state.split, ratio: clampSplitRatio(ratio) } } : state,
-        ),
-      closeSplit: () => set({ split: null }),
-    }),
+    (rawSet, get) => {
+      // Every change runs through here, so a closed, evicted, or pinned tab never stays in a group.
+      const set = (
+        update: (state: WorkspaceTabsState) => Partial<WorkspaceTabsState> | WorkspaceTabsState,
+      ) =>
+        rawSet((state) => {
+          const next = update(state);
+          return next === state ? state : { ...next, ...pruneGroups({ ...state, ...next }) };
+        });
+      const unpinned = (state: GroupFields, key: string): Pick<GroupFields, "keys" | "pinned"> =>
+        state.pinned.includes(key)
+          ? {
+              pinned: state.pinned.filter((open) => open !== key),
+              keys: [
+                ...state.keys.filter((open) => open !== key && state.pinned.includes(open)),
+                key,
+                ...state.keys.filter((open) => open !== key && !state.pinned.includes(open)),
+              ],
+            }
+          : state;
+      return {
+        keys: [],
+        pinned: [],
+        surfaceKey: null,
+        split: null,
+        groups: [],
+        tabGroup: {},
+        open: (key) =>
+          set((state) =>
+            state.keys.includes(key) ? state : { keys: withTab(state.keys, state.pinned, key) },
+          ),
+        showSurface: (key) =>
+          set((state) => ({ surfaceKey: key, keys: withTab(state.keys, state.pinned, key) })),
+        hideSurface: () =>
+          set((state) => (state.surfaceKey === null ? state : { surfaceKey: null })),
+        close: (key) =>
+          set((state) => ({
+            keys: state.keys.filter((open) => open !== key),
+            pinned: state.pinned.filter((open) => open !== key),
+            surfaceKey: state.surfaceKey === key ? null : state.surfaceKey,
+            split: state.split?.key === key ? null : state.split,
+          })),
+        replace: (from, to) =>
+          set((state) => ({
+            keys: state.keys.includes(to)
+              ? state.keys.filter((open) => open !== from)
+              : state.keys.map((open) => (open === from ? to : open)),
+            pinned: state.pinned.includes(from)
+              ? [...state.pinned.filter((open) => open !== from && open !== to), to]
+              : state.pinned,
+            surfaceKey: state.surfaceKey === from ? null : state.surfaceKey,
+            tabGroup:
+              state.tabGroup[from] === undefined || state.keys.includes(to)
+                ? state.tabGroup
+                : { ...state.tabGroup, [to]: state.tabGroup[from] },
+          })),
+        move: (from, to) =>
+          set((state) => {
+            const index = state.keys.indexOf(to);
+            if (from === to || index === -1 || !state.keys.includes(from)) return state;
+            if (state.pinned.includes(from) !== state.pinned.includes(to)) return state;
+            const keys = state.keys.filter((open) => open !== from);
+            keys.splice(index, 0, from);
+            // The dragged tab lands beside `to` and joins its group, as in browsers.
+            const { [from]: _left, ...tabGroup } = state.tabGroup;
+            const target = state.tabGroup[to];
+            return {
+              keys,
+              tabGroup: target === undefined ? tabGroup : { ...tabGroup, [from]: target },
+            };
+          }),
+        togglePin: (key) =>
+          set((state) => {
+            if (!state.keys.includes(key)) return state;
+            const pinned = state.pinned.includes(key)
+              ? state.pinned.filter((open) => open !== key)
+              : [...state.pinned, key];
+            const others = state.keys.filter((open) => open !== key);
+            // Either way the tab lands at the seam: last pinned, or first unpinned.
+            return {
+              pinned,
+              keys: [
+                ...others.filter((open) => pinned.includes(open)),
+                key,
+                ...others.filter((open) => !pinned.includes(open)),
+              ],
+            };
+          }),
+        openSplit: (key, direction) =>
+          set((state) => ({
+            keys: withTab(state.keys, state.pinned, key),
+            split: { key, direction, ratio: state.split?.ratio ?? 0.5 },
+          })),
+        setSplitKey: (key) =>
+          set((state) => (state.split ? { split: { ...state.split, key } } : state)),
+        setSplitRatio: (ratio) =>
+          set((state) =>
+            state.split ? { split: { ...state.split, ratio: clampSplitRatio(ratio) } } : state,
+          ),
+        closeSplit: () => set(() => ({ split: null })),
+        createGroup: (key) => {
+          const id = randomUUID();
+          set((state) => {
+            if (!state.keys.includes(key)) return state;
+            const used = new Set(state.groups.map((group) => group.color));
+            const color = TAB_GROUP_COLORS.find((entry) => !used.has(entry)) ?? "grey";
+            const left = leaveGroup({ ...state, ...unpinned(state, key) }, key);
+            return {
+              ...unpinned(state, key),
+              keys: left.keys,
+              tabGroup: { ...left.tabGroup, [key]: id },
+              groups: [...state.groups, { id, title: "", color, collapsed: false }],
+            };
+          });
+          return get().tabGroup[key] === id ? id : null;
+        },
+        addToGroup: (key, groupId) =>
+          set((state) => {
+            if (!state.keys.includes(key) || state.tabGroup[key] === groupId) return state;
+            const last = state.keys.findLast((open) => state.tabGroup[open] === groupId);
+            if (!last) return state;
+            const free = { ...state, ...unpinned(state, key) };
+            const { [key]: _left, ...tabGroup } = free.tabGroup;
+            return {
+              pinned: free.pinned,
+              keys: placeAfter(free.keys, key, last),
+              tabGroup: { ...tabGroup, [key]: groupId },
+            };
+          }),
+        removeFromGroup: (key) => set((state) => leaveGroup(state, key)),
+        updateGroup: (groupId, patch) =>
+          set((state) => ({
+            groups: state.groups.map((group) =>
+              group.id === groupId ? { ...group, ...patch } : group,
+            ),
+          })),
+        ungroup: (groupId) =>
+          set((state) => ({
+            tabGroup: Object.fromEntries(
+              Object.entries(state.tabGroup).filter(([, id]) => id !== groupId),
+            ),
+          })),
+      };
+    },
     {
       name: "t3code:workspace-tabs:v1",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ keys: state.keys, pinned: state.pinned, split: state.split }),
+      partialize: (state) => ({
+        keys: state.keys,
+        pinned: state.pinned,
+        split: state.split,
+        groups: state.groups,
+        tabGroup: state.tabGroup,
+      }),
     },
   ),
 );

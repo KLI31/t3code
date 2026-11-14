@@ -97,6 +97,7 @@ function layerElectronWindow(window: ReturnType<typeof makeTestWindow>["window"]
       main: Effect.succeedSome(window as Electron.BrowserWindow),
       currentMainOrFirst: Effect.succeedSome(window as Electron.BrowserWindow),
       focusedMainOrFirst: Effect.succeedSome(window as Electron.BrowserWindow),
+      fromSender: () => Effect.succeedNone,
       setMain: () => Effect.void,
       clearMain: () => Effect.void,
       prepareReveal: () => Effect.succeed(false),
@@ -144,7 +145,7 @@ describe("DesktopSshPasswordPrompts", () => {
 
       yield* prompts.resolve({ requestId: request.requestId, password: "secret" });
       assert.equal(yield* Fiber.join(fiber), "secret");
-    }).pipe(Effect.provide(layer(testWindow.window)), Effect.scoped);
+    }).pipe(Effect.provide(layer(testWindow.window)));
   });
 
   it.effect.each(["answered", "cancelled", "timed out", "interrupted"] as const)(
@@ -189,7 +190,7 @@ describe("DesktopSshPasswordPrompts", () => {
             .map((message) => message.args),
           [[request.requestId]],
         );
-      }).pipe(Effect.provide(layer(testWindow.window)), Effect.scoped);
+      }).pipe(Effect.provide(layer(testWindow.window)));
     },
   );
 
@@ -219,6 +220,6 @@ describe("DesktopSshPasswordPrompts", () => {
       assert.equal(password, "secret");
       assert.equal(testWindow.isFocused(), false);
       assert.equal(testWindow.closedListenerCount(), 0);
-    }).pipe(Effect.provide(layer(testWindow.window)), Effect.scoped);
+    }).pipe(Effect.provide(layer(testWindow.window)));
   });
 });

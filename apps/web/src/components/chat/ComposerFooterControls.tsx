@@ -277,6 +277,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
   compactBeforeSendTokens: number | null;
+  hideCompactToggle: boolean;
   keepFullHistory: boolean;
   onToggleKeepFullHistory: () => void;
 }) {
@@ -309,6 +310,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         onInterrupt={props.onInterrupt}
         onImplementPlanInNewThread={props.onImplementPlanInNewThread}
         compactBeforeSendTokens={props.compactBeforeSendTokens}
+        hideCompactToggle={props.hideCompactToggle}
         keepFullHistory={props.keepFullHistory}
         onToggleKeepFullHistory={props.onToggleKeepFullHistory}
       >

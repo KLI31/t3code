@@ -14,6 +14,7 @@ import { type DesktopSnapShotEvent, DEFAULT_CLIENT_SETTINGS } from "@t3tools/con
 
 import * as DesktopAssets from "../app/DesktopAssets.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import * as DesktopPrimaryPaste from "../app/DesktopPrimaryPaste.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
@@ -29,7 +30,10 @@ import {
   TRACKPAD_SCROLL_END_CHANNEL,
   WINDOW_FULLSCREEN_STATE_CHANNEL,
 } from "../ipc/channels.ts";
-import { PASSKEY_BRIDGE_ARGUMENT } from "../preview/GuestProtocol.ts";
+import {
+  PASSKEY_BRIDGE_ARGUMENT,
+  PRIMARY_PASTE_DISABLED_ARGUMENT,
+} from "../preview/GuestProtocol.ts";
 import * as PreviewManager from "../preview/Manager.ts";
 import * as PreviewPasskeys from "../preview/Passkeys.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
@@ -83,6 +87,7 @@ const TITLEBAR_COLOR = "#01000000"; // #00000000 does not work correctly on Linu
 const TITLEBAR_LIGHT_SYMBOL_COLOR = "#1f2937";
 const TITLEBAR_DARK_SYMBOL_COLOR = "#f8fafc";
 const MAIN_WINDOW_BOUNDS_PERSIST_DEBOUNCE_MS = 500;
+const CASCADE_OFFSET_PX = 32;
 const DEVELOPMENT_LOAD_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000] as const;
 const RENDERER_RECOVERY_RELOAD_DELAY_MS = 500;
 const RENDERER_RECOVERY_MAX_ATTEMPTS = 3;
@@ -122,6 +127,8 @@ export class DesktopWindow extends Context.Service<
     readonly ensureMain: Effect.Effect<Electron.BrowserWindow, DesktopWindowError>;
     readonly revealOrCreateMain: Effect.Effect<Electron.BrowserWindow, DesktopWindowError>;
     readonly activate: Effect.Effect<void, DesktopWindowError>;
+    /** Opens another app window on the same backend, or activates the app while none can open yet. */
+    readonly openNewWindow: Effect.Effect<void, DesktopWindowError>;
     readonly createMainIfBackendReady: Effect.Effect<void, DesktopWindowError>;
     readonly showConnectingSplash: Effect.Effect<void>;
     readonly handleBackendReady: (httpBaseUrl: URL) => Effect.Effect<void, DesktopWindowError>;
@@ -177,6 +184,58 @@ function windowFitsWithinDisplay(
     windowBounds.x + windowBounds.width <= displayBounds.x + displayBounds.width + tolerance &&
     windowBounds.y + windowBounds.height <= displayBounds.y + displayBounds.height + tolerance
   );
+}
+
+function overlapArea(left: DisplayBounds, right: DisplayBounds): number {
+  const width = Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x);
+  const height = Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+
+function displayMatching(
+  bounds: DisplayBounds,
+  displays: readonly DisplayBounds[],
+): DisplayBounds | undefined {
+  let match: DisplayBounds | undefined;
+  let matchArea = 0;
+  for (const display of displays) {
+    const area = overlapArea(bounds, display);
+    if (area > matchArea) {
+      match = display;
+      matchArea = area;
+    }
+  }
+  return match;
+}
+
+// Normal bounds of a maximized window can sit on, or straddle into, another display than the window.
+function normalBoundsOnWindowDisplay(
+  normalBounds: DisplayBounds,
+  windowBounds: DisplayBounds,
+  displays: readonly DisplayBounds[],
+): DisplayBounds {
+  const target = displayMatching(windowBounds, displays);
+  if (target === undefined || windowFitsWithinDisplay(normalBounds, target)) {
+    return normalBounds;
+  }
+  const source = displayMatching(normalBounds, displays) ?? target;
+  const width = Math.min(normalBounds.width, target.width);
+  const height = Math.min(normalBounds.height, target.height);
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  return {
+    x: clamp(target.x + normalBounds.x - source.x, target.x, target.x + target.width - width),
+    y: clamp(target.y + normalBounds.y - source.y, target.y, target.y + target.height - height),
+    width,
+    height,
+  };
+}
+
+function readDisplayBoundsOrEmpty(): readonly DisplayBounds[] {
+  try {
+    return Electron.screen.getAllDisplays().map((display) => display.bounds);
+  } catch {
+    return [];
+  }
 }
 
 function windowBoundsEqual(
@@ -345,6 +404,7 @@ export const make = Effect.gen(function* () {
   const electronWindow = yield* ElectronWindow.ElectronWindow;
   const previewManager = yield* PreviewManager.PreviewManager;
   const previewPasskeys = yield* PreviewPasskeys.PreviewPasskeys;
+  const primaryPaste = yield* DesktopPrimaryPaste.DesktopPrimaryPaste;
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
   const clientSettings = yield* DesktopClientSettings.DesktopClientSettings;
   const electronApp = yield* ElectronApp.ElectronApp;
@@ -361,7 +421,7 @@ export const make = Effect.gen(function* () {
   const revealMain = Effect.fn("desktop.window.revealMain")((window: Electron.BrowserWindow) =>
     Effect.suspend(() => pendingMainReveals.get(window) ?? electronWindow.reveal(window)),
   );
-  let flushMainWindowBounds: Effect.Effect<void> = Effect.void;
+  const flushWindowBounds = new WeakMap<Electron.BrowserWindow, Effect.Effect<void>>();
 
   const dismissConnectingSplash = Effect.gen(function* () {
     const splash = yield* Ref.getAndSet(splashWindowRef, Option.none());
@@ -396,10 +456,10 @@ export const make = Effect.gen(function* () {
     yield* previewManager.reapplyZoom();
   });
 
-  const createWindow = Effect.fn("desktop.window.createWindow")(function* (): Effect.fn.Return<
-    Option.Option<Electron.BrowserWindow>,
-    DesktopWindowError
-  > {
+  /** `cascadeFrom` opens an extra window just below and right of that one, instead of the saved spot. */
+  const createWindow = Effect.fn("desktop.window.createWindow")(function* (
+    cascadeFrom?: Electron.BrowserWindow,
+  ): Effect.fn.Return<Option.Option<Electron.BrowserWindow>, DesktopWindowError> {
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
     yield* previewManager.getBrowserSession();
     const applicationUrl = getDesktopUrl(environment.isDevelopment);
@@ -424,9 +484,26 @@ export const make = Effect.gen(function* () {
         : yield* logWindowWarning("failed to read connected displays; using defaults", {
             cause: displayBoundsResult.cause,
           }).pipe(Effect.as<readonly Electron.Rectangle[]>([]));
-    const initialBounds = resolveInitialMainWindowBounds(persistedBounds, displayBounds);
-    const restoredPersistedBounds = persistedBounds !== null && initialBounds === persistedBounds;
-    if (persistedBounds !== null && initialBounds === DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE) {
+    const cascadeBounds =
+      cascadeFrom && !cascadeFrom.isDestroyed()
+        ? (({ x, y, width, height }) => ({
+            x: x + CASCADE_OFFSET_PX,
+            y: y + CASCADE_OFFSET_PX,
+            width,
+            height,
+          }))(cascadeFrom.getNormalBounds())
+        : null;
+    const initialBounds = resolveInitialMainWindowBounds(
+      cascadeBounds ?? persistedBounds,
+      displayBounds,
+    );
+    const restoredPersistedBounds =
+      cascadeBounds === null && persistedBounds !== null && initialBounds === persistedBounds;
+    if (
+      cascadeBounds === null &&
+      persistedBounds !== null &&
+      initialBounds === DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE
+    ) {
       yield* logWindowWarning("saved main window bounds could not be restored; using defaults");
     }
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
@@ -467,33 +544,52 @@ export const make = Effect.gen(function* () {
     let boundsPersistFiber: Fiber.Fiber<void, never> | undefined;
     let pendingBoundsPersistFiber: Fiber.Fiber<void, never> | undefined;
     let boundsPersistenceEnabled = persistedBounds === null || restoredPersistedBounds;
-    const readPersistableBounds = (): DesktopAppSettings.DesktopWindowBounds | null => {
+    let lastPersistableState: {
+      readonly bounds: DesktopAppSettings.DesktopWindowBounds;
+      readonly isMaximized: boolean;
+    } | null = null;
+    const readPersistableState = () => {
       if (window.isDestroyed()) {
         return null;
       }
+      // Minimized windows report stale state on some platforms (macOS: not maximized, the
+      // pre-move normal frame; Windows: -32000), so they keep the state seen before minimizing.
+      if (window.isMinimized()) {
+        return lastPersistableState;
+      }
+      const isMaximized = window.isMaximized();
       const bounds =
-        window.isFullScreen() || window.isMaximized() || window.isMinimized()
-          ? window.getNormalBounds()
+        window.isFullScreen() || isMaximized
+          ? normalBoundsOnWindowDisplay(
+              window.getNormalBounds(),
+              window.getBounds(),
+              readDisplayBoundsOrEmpty(),
+            )
           : window.getBounds();
-      return DesktopAppSettings.normalizeMainWindowBounds({
+      const persistableBounds = DesktopAppSettings.normalizeMainWindowBounds({
         x: Math.round(bounds.x),
         y: Math.round(bounds.y),
         width: Math.round(bounds.width),
         height: Math.round(bounds.height),
       });
+      lastPersistableState =
+        persistableBounds === null ? null : { bounds: persistableBounds, isMaximized };
+      return lastPersistableState;
     };
-    const fallbackWindowBounds = boundsPersistenceEnabled ? null : readPersistableBounds();
+    const fallbackWindowBounds = boundsPersistenceEnabled
+      ? null
+      : (readPersistableState()?.bounds ?? null);
     const fallbackWindowMaximized = persistedSettings.mainWindowMaximized;
     const persistCurrentBounds = (): Fiber.Fiber<void, never> | undefined => {
       if (!boundsPersistenceEnabled) {
         return pendingBoundsPersistFiber;
       }
-      const bounds = readPersistableBounds();
-      if (bounds === null) {
+      const state = readPersistableState();
+      if (state === null) {
         return pendingBoundsPersistFiber;
       }
       pendingBoundsPersistFiber = runFork(
-        desktopSettings.setMainWindowBounds(bounds, window.isMaximized()).pipe(
+        desktopSettings.setMainWindowBounds(state.bounds, state.isMaximized).pipe(
           Effect.asVoid,
           Effect.catch((error) =>
             logWindowWarning("failed to persist main window bounds", {
@@ -505,16 +601,15 @@ export const make = Effect.gen(function* () {
       return pendingBoundsPersistFiber;
     };
     const scheduleBoundsPersist = () => {
-      if (!boundsPersistenceEnabled) {
-        const currentBounds = readPersistableBounds();
-        if (
-          currentBounds === null ||
+      const state = readPersistableState();
+      if (
+        !boundsPersistenceEnabled &&
+        (state === null ||
           (fallbackWindowBounds !== null &&
-            windowBoundsEqual(currentBounds, fallbackWindowBounds) &&
-            window.isMaximized() === fallbackWindowMaximized)
-        ) {
-          return;
-        }
+            windowBoundsEqual(state.bounds, fallbackWindowBounds) &&
+            state.isMaximized === fallbackWindowMaximized))
+      ) {
+        return;
       }
       boundsPersistenceEnabled = true;
       if (boundsPersistFiber !== undefined) {
@@ -549,7 +644,7 @@ export const make = Effect.gen(function* () {
         fiber === undefined ? Effect.void : Fiber.join(fiber).pipe(Effect.asVoid),
       ),
     );
-    flushMainWindowBounds = flushBoundsPersist;
+    flushWindowBounds.set(window, flushBoundsPersist);
 
     yield* previewManager.setMainWindow(window);
     if (yield* Ref.get(desktopState.quitting)) {
@@ -573,6 +668,12 @@ export const make = Effect.gen(function* () {
         webPreferences.additionalArguments = [
           ...(webPreferences.additionalArguments ?? []),
           PASSKEY_BRIDGE_ARGUMENT,
+        ];
+      }
+      if (!primaryPaste.enabled) {
+        webPreferences.additionalArguments = [
+          ...(webPreferences.additionalArguments ?? []),
+          PRIMARY_PASTE_DISABLED_ARGUMENT,
         ];
       }
     });
@@ -748,7 +849,10 @@ export const make = Effect.gen(function* () {
       runFork(zoomWindow(window, direction));
     });
 
-    window.on("page-title-updated", (event) => {
+    // The renderer titles the window after the open thread; only a blank title
+    // falls back to the app name.
+    window.on("page-title-updated", (event, title) => {
+      if (title.trim() !== "") return;
       event.preventDefault();
       window.setTitle(environment.displayName);
     });
@@ -831,7 +935,6 @@ export const make = Effect.gen(function* () {
       }
       clearDevelopmentLoadRetry();
       developmentLoadRetryIndex = 0;
-      window.setTitle(environment.displayName);
       if (environment.platform === "darwin") syncMacosWindowButtons(window);
     });
     window.webContents.on(
@@ -911,7 +1014,7 @@ export const make = Effect.gen(function* () {
       firstRevealComplete = true;
       pendingMainReveals.delete(window);
       window.webContents.setBackgroundThrottling(true);
-      if (persistedSettings.mainWindowMaximized) window.maximize();
+      if (persistedSettings.mainWindowMaximized && cascadeBounds === null) window.maximize();
       yield* electronWindow.reveal(window);
       yield* dismissConnectingSplash;
     });
@@ -921,8 +1024,9 @@ export const make = Effect.gen(function* () {
       void runPromise(revealWhenReady);
     });
 
-    // Desktop IPC only answers the main window, so register it before its renderer can call in.
+    // Desktop IPC only answers app windows, so register it before its renderer can call in.
     yield* electronWindow.setMain(window);
+    window.on("focus", () => void runPromise(electronWindow.setMain(window)));
     loadApplication();
     if (environment.isDevelopment) {
       window.webContents.openDevTools({ mode: "detach" });
@@ -1055,6 +1159,35 @@ export const make = Effect.gen(function* () {
     yield* dispatch;
   });
 
+  const activate = Effect.gen(function* () {
+    if (yield* Ref.get(desktopState.quitting)) return;
+    const existingWindow = yield* currentMainWindow;
+    if (Option.isSome(existingWindow)) {
+      yield* revealMain(existingWindow.value);
+      return;
+    }
+    if (mainClosedDuringStartup) {
+      yield* ensureMain;
+      return;
+    }
+    const backendReady = yield* Ref.get(backendReadyRef);
+    if (!backendReady) {
+      const splash = yield* Ref.get(splashWindowRef);
+      if (Option.isSome(splash)) {
+        yield* electronWindow.reveal(splash.value);
+        return;
+      }
+    }
+    yield* createMainIfBackendReady;
+  }).pipe(Effect.withSpan("desktop.window.activate"));
+
+  const openNewWindow = Effect.gen(function* () {
+    if (yield* Ref.get(desktopState.quitting)) return;
+    const from = yield* focusedMainWindow;
+    if (Option.isNone(from) || (yield* waitingForBackend)) return yield* activate;
+    yield* createWindow(from.value).pipe(mainWindowMutex.withPermits(1));
+  }).pipe(Effect.withSpan("desktop.window.openNewWindow"));
+
   return DesktopWindow.of({
     createMain: createMain.pipe(Effect.flatMap(requireWindow)),
     ensureMain: ensureMain.pipe(Effect.flatMap(requireWindow)),
@@ -1065,27 +1198,8 @@ export const make = Effect.gen(function* () {
         yield* electronWindow.prepareReveal(existingWindow.value);
       }
     }),
-    activate: Effect.gen(function* () {
-      if (yield* Ref.get(desktopState.quitting)) return;
-      const existingWindow = yield* currentMainWindow;
-      if (Option.isSome(existingWindow)) {
-        yield* revealMain(existingWindow.value);
-        return;
-      }
-      if (mainClosedDuringStartup) {
-        yield* ensureMain;
-        return;
-      }
-      const backendReady = yield* Ref.get(backendReadyRef);
-      if (!backendReady) {
-        const splash = yield* Ref.get(splashWindowRef);
-        if (Option.isSome(splash)) {
-          yield* electronWindow.reveal(splash.value);
-          return;
-        }
-      }
-      yield* createMainIfBackendReady;
-    }).pipe(Effect.withSpan("desktop.window.activate")),
+    activate,
+    openNewWindow,
     createMainIfBackendReady,
     showConnectingSplash,
     handleBackendReady: Effect.fn("desktop.window.handleBackendReady")(function* (httpBaseUrl) {
@@ -1097,7 +1211,10 @@ export const make = Effect.gen(function* () {
     handleBackendNotReady: Ref.set(backendReadyRef, false).pipe(
       Effect.withSpan("desktop.window.handleBackendNotReady"),
     ),
-    flushMainWindowBounds: Effect.suspend(() => flushMainWindowBounds).pipe(
+    flushMainWindowBounds: electronWindow.main.pipe(
+      Effect.flatMap((main) =>
+        Option.isSome(main) ? (flushWindowBounds.get(main.value) ?? Effect.void) : Effect.void,
+      ),
       Effect.withSpan("desktop.window.flushMainWindowBounds"),
     ),
     dispatchMenuAction: Effect.fn("desktop.window.dispatchMenuAction")(function* (action, options) {

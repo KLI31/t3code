@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as TestClock from "effect/testing/TestClock";
 
@@ -49,6 +50,7 @@ function layerElectronApp(
     setName: () => Effect.void,
     setAboutPanelOptions: () => Effect.void,
     setAppUserModelId: () => Effect.void,
+    setUserTasks: () => Effect.void,
     getAppMetrics: Effect.succeed([]),
     setAsDefaultProtocolClient: () => Effect.succeed(true),
     setDesktopName: () => Effect.void,
@@ -73,6 +75,7 @@ function layerElectronWindow(destroyAll: Effect.Effect<void> = Effect.void) {
     main: Effect.die("unexpected main window read"),
     currentMainOrFirst: Effect.die("unexpected current window read"),
     focusedMainOrFirst: Effect.die("unexpected focused window read"),
+    fromSender: () => Effect.succeedNone,
     setMain: () => Effect.void,
     clearMain: () => Effect.void,
     prepareReveal: () => Effect.succeed(false),
@@ -94,6 +97,7 @@ function layerDesktopWindow(
     ensureMain: Effect.die("unexpected window creation"),
     revealOrCreateMain: Effect.die("unexpected window creation"),
     activate: input.activate ?? Effect.void,
+    openNewWindow: Effect.void,
     createMainIfBackendReady: Effect.void,
     showConnectingSplash: Effect.void,
     handleBackendReady: () => Effect.void,
@@ -117,6 +121,7 @@ describe("DesktopLifecycle", () => {
       const layerEnvironment = Layer.succeed(DesktopEnvironment.DesktopEnvironment, {
         platform,
         isDevelopment: false,
+        appImagePath: Option.none(),
       } as DesktopEnvironment.DesktopEnvironment["Service"]);
 
       const layer = DesktopLifecycle.layer.pipe(

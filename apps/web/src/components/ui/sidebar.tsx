@@ -17,6 +17,7 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useResizeDrag } from "~/hooks/useResizeDrag";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
+import { useClientSettings } from "~/hooks/useSettings";
 import {
   getLocalStorageItem,
   setLocalStorageItem,
@@ -38,7 +39,7 @@ type SidebarContextProps = {
   setOpen: (open: boolean) => void;
   openMobile: boolean;
   mobileSheetMounted: boolean;
-  setMobileSheetElement: (element: HTMLDivElement | null) => void;
+  setMobileSheetMounted: (mounted: boolean) => void;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
@@ -204,9 +205,13 @@ function SidebarProvider({
     store.getSnapshot,
   );
   const [mobileSheetMounted, setMobileSheetMounted] = React.useState(false);
-  const setMobileSheetElement = (element: HTMLDivElement | null) => {
-    setMobileSheetMounted(element !== null);
-  };
+  if (openMobile && !mobileSheetMounted) {
+    setMobileSheetMounted(true);
+  }
+  // Widening mid-close unmounts the sheet before its close completes.
+  if (!isMobile && !openMobile && mobileSheetMounted) {
+    setMobileSheetMounted(false);
+  }
 
   const state = resolveSidebarState({ isMobile, open, openMobile });
 
@@ -215,7 +220,7 @@ function SidebarProvider({
     open,
     openMobile,
     mobileSheetMounted,
-    setMobileSheetElement,
+    setMobileSheetMounted,
     setOpen: store.setOpen,
     setOpenMobile: store.setOpenMobile,
     state,
@@ -287,7 +292,13 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none";
   resizable?: boolean | SidebarResizableOptions;
 }) {
-  const { isMobile, state, openMobile, setOpenMobile, setMobileSheetElement } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, setMobileSheetMounted } = useSidebar();
+  // Not usePanelAnimationSettings: its navigation suppression would snap the sheet shut mid-exit when an item navigates.
+  const panelAnimationDurationMs = useClientSettings(
+    (settings) => settings.panelAnimationDurationMs,
+  );
+  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const panelAnimationsActive = panelAnimationDurationMs > 0 && !prefersReducedMotion;
   const offcanvasCollapsed = !isMobile && collapsible === "offcanvas" && state === "collapsed";
 
   const resolvedResizable = resolveSidebarResizable({ collapsible, isMobile, resizable });
@@ -313,9 +324,17 @@ function Sidebar({
   if (isMobile) {
     return (
       <SidebarInstanceContext value={instanceContextValue}>
-        <Sheet onOpenChange={setOpenMobile} open={openMobile}>
+        <Sheet
+          onOpenChange={setOpenMobile}
+          onOpenChangeComplete={(open) => {
+            if (!open) setMobileSheetMounted(false);
+          }}
+          open={openMobile}
+        >
+          {/* Children stay mounted while closed so their window shortcuts, like thread jumps, keep working. */}
           <SheetPopup
-            ref={setMobileSheetElement}
+            keepMounted
+            {...(panelAnimationsActive ? {} : { transitionDurationMs: 0 })}
             className={cn(
               "w-(--sidebar-width) max-w-none bg-sidebar surface-grain p-0 text-sidebar-foreground",
               className,
@@ -365,8 +384,9 @@ function Sidebar({
       >
         <div
           className={cn(
+            // The gap snaps rather than animating its width: a width transition re-lays out the
+            // whole chat every frame. The container below slides over the change on the GPU.
             "relative w-(--sidebar-width) bg-transparent",
-            "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -378,10 +398,10 @@ function Sidebar({
         <div
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
-            "[[data-panel-animations=true]_&]:transition-[left,right,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
+            "[[data-panel-animations=true]_&]:transition-[translate,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
             side === "left"
-              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+              ? "left-0 group-data-[collapsible=offcanvas]:-translate-x-full"
+              : "right-0 group-data-[collapsible=offcanvas]:translate-x-full",
             variant === "floating" || variant === "inset"
               ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
               : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",

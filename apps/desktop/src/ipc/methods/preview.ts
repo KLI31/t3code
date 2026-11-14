@@ -94,9 +94,11 @@ const closeTab = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.PREVIEW_CLOSE_TAB_CHANNEL,
   payload: DesktopPreviewTabInputSchema,
   result: Schema.Void,
-  handler: Effect.fn("desktop.ipc.preview.closeTab")(function* ({ tabId }) {
+  handler: Effect.fn("desktop.ipc.preview.closeTab")(function* ({ tabId }, event) {
     const manager = yield* PreviewManager.PreviewManager;
-    yield* manager.closeTab(tabId);
+    yield* event === undefined
+      ? manager.closeTab(tabId)
+      : manager.closeTabFromSender(tabId, event.sender.id);
   }),
 });
 
@@ -167,6 +169,11 @@ const refresh = tabMethod(
   IpcChannels.PREVIEW_REFRESH_CHANNEL,
   "desktop.ipc.preview.refresh",
   (manager, tabId) => manager.refresh(tabId),
+);
+const stopLoading = tabMethod(
+  IpcChannels.PREVIEW_STOP_LOADING_CHANNEL,
+  "desktop.ipc.preview.stopLoading",
+  (manager, tabId) => manager.stopLoading(tabId),
 );
 const zoomIn = tabMethod(
   IpcChannels.PREVIEW_ZOOM_IN_CHANNEL,
@@ -472,6 +479,7 @@ export const methods = [
   goBack,
   goForward,
   refresh,
+  stopLoading,
   zoomIn,
   zoomOut,
   resetZoom,

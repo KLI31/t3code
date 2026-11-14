@@ -61,6 +61,8 @@ export class ElectronApp extends Context.Service<
       options: Electron.AboutPanelOptionsOptions,
     ) => Effect.Effect<void>;
     readonly setAppUserModelId: (id: string) => Effect.Effect<void>;
+    /** Windows taskbar jump list entries. */
+    readonly setUserTasks: (tasks: ReadonlyArray<Electron.Task>) => Effect.Effect<void>;
     readonly getAppMetrics: Effect.Effect<ReadonlyArray<Electron.ProcessMetric>>;
     readonly setAsDefaultProtocolClient: (
       protocol: string,
@@ -196,6 +198,11 @@ export const make = ElectronApp.of({
   setAppUserModelId: Effect.fn("ElectronApp.setAppUserModelId")(function (id) {
     return Effect.sync(() => {
       Electron.app.setAppUserModelId(id);
+    });
+  }),
+  setUserTasks: Effect.fn("ElectronApp.setUserTasks")(function (tasks) {
+    return Effect.sync(() => {
+      Electron.app.setUserTasks([...tasks]);
     });
   }),
   getAppMetrics: Effect.sync(() => Electron.app.getAppMetrics()),

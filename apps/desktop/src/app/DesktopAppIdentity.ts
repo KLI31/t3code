@@ -103,6 +103,19 @@ export const make = Effect.gen(function* () {
 
     if (environment.platform === "win32") {
       yield* electronApp.setAppUserModelId(environment.appUserModelId);
+      // Relaunching reaches the running app as a second instance, which opens another window.
+      if (environment.isPackaged) {
+        yield* electronApp.setUserTasks([
+          {
+            program: process.execPath,
+            arguments: "--new-window",
+            iconPath: process.execPath,
+            iconIndex: 0,
+            title: "New Window",
+            description: `Open another ${environment.displayName} window`,
+          },
+        ]);
+      }
     }
 
     // Packaged bundles carry their icon in Info.plist; setting it again overwrites the user's custom icon.

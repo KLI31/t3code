@@ -47,6 +47,7 @@ function layerElectronApp(
     setName: () => Effect.void,
     setAboutPanelOptions: () => Effect.void,
     setAppUserModelId: () => Effect.void,
+    setUserTasks: () => Effect.void,
     getAppMetrics: Effect.sync(() => {
       onMetricsRead();
       return metrics;
