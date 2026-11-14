@@ -264,8 +264,8 @@ thread** from its long-press menu on mobile.
 keeps the provider's explanation. Retry after the limit resets, or switch to
 another provider instance.
 Press **Resume** in an empty composer to continue a limited or interrupted turn
-manually. Do this when the provider reports no reset time, because nothing
-continues the turn on its own.
+manually when the provider supports native continuation, or send a message to continue.
+Do this when the provider reports no reset time, because nothing continues the turn on its own.
 If another signed-in account of the same provider is configured as a provider
 instance, choose **Continue on <account>** to continue the turn there right away.
 Codex accounts set up with a shared home and a shadow home resume the same

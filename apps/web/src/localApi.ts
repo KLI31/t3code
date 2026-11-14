@@ -1,6 +1,12 @@
-import type { ConfirmDialogOptions, ContextMenuItem, LocalApi } from "@t3tools/contracts";
+import type {
+  ConfirmDialogOptions,
+  ContextMenuItem,
+  ContextMenuSource,
+  LocalApi,
+} from "@t3tools/contracts";
 
 import { isMacPlatform } from "@t3tools/shared/keybindings";
+import { isWebUrl } from "./browser/webUrl";
 
 import { requestConfirmDialog } from "./confirmDialog";
 import { dismissContextMenu, showContextMenuFallback } from "./contextMenuFallback";
@@ -29,6 +35,7 @@ export function createLocalApi(): LocalApi {
           return;
         }
 
+        if (!isWebUrl(url)) throw new Error("Unable to open link.");
         window.open(url, "_blank", "noopener,noreferrer");
       },
       openSystemSettings: async (pane) => {
@@ -45,10 +52,11 @@ export function createLocalApi(): LocalApi {
       show: async <T extends string>(
         items: readonly ContextMenuItem<T>[],
         position?: { x: number; y: number },
+        source?: ContextMenuSource,
       ): Promise<T | null> => {
         // Native menus only fit the app's look on macOS; elsewhere the styled DOM menu wins.
         if (window.desktopBridge && isMacPlatform(navigator.platform)) {
-          return window.desktopBridge.showContextMenu(items, position) as Promise<T | null>;
+          return window.desktopBridge.showContextMenu(items, position, source) as Promise<T | null>;
         }
         return showContextMenuFallback(items, position);
       },
