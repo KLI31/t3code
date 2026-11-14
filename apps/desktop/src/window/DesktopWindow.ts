@@ -1184,7 +1184,7 @@ export const make = Effect.gen(function* () {
 
   const openNewWindow = Effect.gen(function* () {
     if (yield* Ref.get(desktopState.quitting)) return;
-    const from = yield* focusedMainWindow;
+    const from = yield* currentMainWindow;
     if (Option.isNone(from) || (yield* waitingForBackend)) return yield* activate;
     yield* createWindow(from.value).pipe(mainWindowMutex.withPermits(1));
   }).pipe(Effect.withSpan("desktop.window.openNewWindow"));
