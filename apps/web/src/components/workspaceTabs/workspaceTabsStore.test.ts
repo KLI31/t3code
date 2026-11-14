@@ -128,6 +128,27 @@ describe("tab groups", () => {
     expect(state()).toMatchObject({ keys: ["b", "c", "a", "d"], tabGroup: { b: group, c: other } });
   });
 
+  it("moves a whole group past tabs and other groups without splitting them", () => {
+    const store = setup();
+    store.open("c");
+    store.open("d");
+    store.open("e");
+    const group = store.createGroup("a")!;
+    store.addToGroup("b", group);
+    const other = store.createGroup("d")!;
+    store.addToGroup("e", other);
+    expect(state().keys).toEqual(["a", "b", "c", "d", "e"]);
+
+    store.moveGroup(group, "c");
+    expect(state().keys).toEqual(["c", "a", "b", "d", "e"]);
+    // Dropped on a member of another group, it lands past that whole group.
+    store.moveGroup(group, "d");
+    expect(state().keys).toEqual(["c", "d", "e", "a", "b"]);
+    store.moveGroup(group, "e");
+    expect(state().keys).toEqual(["c", "a", "b", "d", "e"]);
+    expect(state().tabGroup).toEqual({ a: group, b: group, d: other, e: other });
+  });
+
   it("drops a group once closing, pinning, or ungrouping empties it", () => {
     const store = setup();
     const group = store.createGroup("a")!;

@@ -161,6 +161,8 @@ interface WorkspaceTabsState {
   ) => void;
   /** Dissolves the group; its tabs stay open where they are. */
   ungroup: (groupId: string) => void;
+  /** Moves the whole group to where `to` sits, past `to`'s own group if it has one. */
+  moveGroup: (groupId: string, to: string) => void;
 }
 
 export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
@@ -301,6 +303,26 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>()(
               group.id === groupId ? { ...group, ...patch } : group,
             ),
           })),
+        moveGroup: (groupId, to) =>
+          set((state) => {
+            const block = state.keys.filter((open) => state.tabGroup[open] === groupId);
+            const first = block[0];
+            if (!first || block.includes(to) || !state.keys.includes(to)) return state;
+            if (state.pinned.includes(to)) return state;
+            const rest = state.keys.filter((open) => state.tabGroup[open] !== groupId);
+            // Landing inside another group would split it, so the block goes to that group's edge.
+            const targetGroup = state.tabGroup[to];
+            const anchors =
+              targetGroup === undefined
+                ? [to]
+                : rest.filter((open) => state.tabGroup[open] === targetGroup);
+            const movingRight = state.keys.indexOf(to) > state.keys.indexOf(first);
+            const index = movingRight
+              ? rest.indexOf(anchors.at(-1)!) + 1
+              : rest.indexOf(anchors[0]!);
+            rest.splice(index, 0, ...block);
+            return { keys: rest };
+          }),
         ungroup: (groupId) =>
           set((state) => ({
             tabGroup: Object.fromEntries(
