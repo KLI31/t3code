@@ -214,7 +214,9 @@ export function UsageLimitRecoveryCard({
             {continueTargets.map(({ provider, selection }) => (
               <RecoveryAction
                 key={provider.instanceId}
-                label={`Continue on ${provider.displayName ?? provider.auth.email ?? provider.instanceId}`}
+                label={gt("Continue on {provider}", {
+                  provider: provider.displayName ?? provider.auth.email ?? provider.instanceId,
+                })}
                 disabled={actionPending}
                 onPress={() => continueOn(selection)}
               />

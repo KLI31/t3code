@@ -366,7 +366,7 @@ export function AppearanceSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("smooth-text-reveal")}
-          description="Fade in words as replies stream instead of showing each burst at once."
+          description={gt("Fade in words as replies stream instead of showing each burst at once.")}
           resetAction={
             settings.smoothTextReveal !== DEFAULT_UNIFIED_SETTINGS.smoothTextReveal ? (
               <SettingResetButton
@@ -381,7 +381,7 @@ export function AppearanceSettingsPanel() {
             <Switch
               checked={settings.smoothTextReveal}
               onCheckedChange={(checked) => updateSettings({ smoothTextReveal: Boolean(checked) })}
-              aria-label="Smooth text reveal"
+              aria-label={gt("Smooth text reveal")}
             />
           }
         />

@@ -51,8 +51,8 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   const RuntimeModeIcon = runtimeModeOption.icon;
   const interactionModeTooltip =
     props.interactionMode === "plan"
-      ? "Plan mode. Click to return to normal build mode"
-      : "Default mode. Click to enter plan mode";
+      ? gt("Plan mode. Click to return to normal build mode")
+      : gt("Default mode. Click to enter plan mode");
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <Tooltip>
@@ -86,7 +86,9 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
           data-composer-control-label
           className={size === "xs" ? "sr-only" : "sr-only sm:not-sr-only"}
         >
-          {props.interactionMode === "plan" ? "Plan" : "Build"}
+          {props.interactionMode === "plan"
+            ? gt("Plan", { $context: "composer interaction mode" })
+            : gt("Build", { $context: "composer interaction mode" })}
         </span>
       </TooltipTrigger>
       <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>

@@ -82,8 +82,10 @@ export function resolvePlanFollowUpSubmission(input: { draftText: string; planMa
 export function buildPlanImplementationThreadTitle(planMarkdown: string): string {
   const title = proposedPlanTitle(planMarkdown);
   if (!title) {
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- stored on the server as the thread title, shared by every viewer
     return "Implement plan";
   }
+  // oxlint-disable-next-line t3code/no-untranslated-copy -- stored on the server as the thread title, shared by every viewer
   return `Implement ${title}`;
 }
 

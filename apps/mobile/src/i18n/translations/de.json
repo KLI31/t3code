@@ -4687,6 +4687,7 @@
   "7c4d4a4481a7051d": "Nutzungslimit erreicht. Wird am {date} fortgesetzt.",
   "e4fa62fc48f25391": "Nutzungslimit erreicht. Wird am {date} zurückgesetzt.",
   "2e3243344196188b": "Nutzungslimit erreicht. Der Anbieter hat keinen Zeitpunkt für die Zurücksetzung gemeldet. Versuch es manuell erneut, wenn dein Limit verfügbar ist.",
+  "f9d5ac1755664fdb": "Continue on {provider}",
   "0233fffeb2b0c531": "Automatisches Fortsetzen abbrechen",
   "f89ef34bbf5911ee": "Bei Zurücksetzung fortsetzen",
   "51a1a709a4972f7e": "Bis zur Zurücksetzung zurückstellen",

@@ -385,7 +385,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             {...pointerFocusProps}
             disabled={isSendBusy || isSendDisabled || isEnvironmentUnavailable}
           >
-            {isSendBusy ? "Sending..." : "Refine"}
+            {isSendBusy
+              ? gt("Sending...")
+              : gt("Refine", { $context: "verb, revises the proposed plan" })}
           </button>
         </>,
       );
@@ -401,7 +403,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             {...pointerFocusProps}
             disabled={isSendBusy || isSendDisabled || isEnvironmentUnavailable}
           >
-            {isSendBusy ? "Sending..." : "Implement"}
+            {isSendBusy
+              ? gt("Sending...")
+              : gt("Implement", { $context: "verb, implements the proposed plan" })}
           </button>
           <Menu>
             <MenuTrigger
@@ -412,7 +416,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                     messageActionPillClassName,
                     "h-9 rounded-l-none border-l border-message-action-foreground/20 px-2 sm:h-8",
                   )}
-                  aria-label="Implementation actions"
+                  aria-label={gt("Implementation actions")}
                   onMouseDown={
                     preserveComposerFocusOnPointerDown
                       ? (event) => event.preventDefault()
@@ -431,7 +435,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                   if (canOperateThread) onImplementPlanInNewThread();
                 }}
               >
-                Implement in a new thread
+                {gt("Implement in a new thread")}
               </MenuItem>
             </MenuPopup>
           </Menu>

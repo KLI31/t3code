@@ -385,27 +385,27 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "chat-background-image",
-    title: "Chat background",
+    title: msg("Chat background"),
     to: "/settings/appearance",
-    searchTerms: ["wallpaper image picture artwork backdrop custom photo"],
+    searchTerms: [msg("wallpaper image picture artwork backdrop custom photo")],
   },
   {
     id: "chat-background-effect",
-    title: "Background effect",
+    title: msg("Background effect"),
     to: "/settings/appearance",
-    searchTerms: ["dither halftone ascii scanlines wallpaper pixel retro"],
+    searchTerms: [msg("dither halftone ascii scanlines wallpaper pixel retro")],
   },
   {
     id: "chat-background-scope",
-    title: "Show background on",
+    title: msg("Show background on"),
     to: "/settings/appearance",
-    searchTerms: ["wallpaper new thread empty all threads"],
+    searchTerms: [msg("wallpaper new thread empty all threads")],
   },
   {
     id: "chat-background-opacity",
-    title: "Background visibility",
+    title: msg("Background visibility"),
     to: "/settings/appearance",
-    searchTerms: ["wallpaper opacity strength fade"],
+    searchTerms: [msg("wallpaper opacity strength fade")],
   },
   {
     id: "math-rendering",
@@ -415,9 +415,9 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "smooth-text-reveal",
-    title: "Smooth text reveal",
+    title: msg("Smooth text reveal"),
     to: "/settings/appearance",
-    searchTerms: ["streaming fade words animation reply"],
+    searchTerms: [msg("streaming fade words animation reply")],
   },
   {
     id: "panel-animations",
@@ -913,10 +913,10 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "notes-vault-folder",
-    title: "Notes vault folder",
+    title: msg("Notes vault folder"),
     to: "/settings/general",
     scope: "environment",
-    searchTerms: ["obsidian vault markdown notes folder path"],
+    searchTerms: [msg("obsidian vault markdown notes folder path")],
   },
   {
     id: "ghq-clone-layout",

@@ -3077,7 +3077,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       )}
                       <span className="truncate">
                         {scopedProjectGroups.length === 0
-                          ? "All projects"
+                          ? gt("All projects")
                           : scopedProjectGroups.map((project) => project.displayName).join(", ")}
                       </span>
                       <ChevronDownIcon className="size-3.5 shrink-0 text-sidebar-muted-foreground" />

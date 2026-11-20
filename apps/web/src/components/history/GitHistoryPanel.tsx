@@ -4,6 +4,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import type { ScopedThreadRef, VcsHistoryCommit } from "@t3tools/contracts";
+import { T, useGT } from "gt-react";
 import { GitBranchIcon, TagIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -35,6 +36,7 @@ export function GitHistoryPanel({ threadRef, cwd }: { threadRef: ScopedThreadRef
   const readHistory = useAtomCommand(vcsEnvironment.readHistory, { reportFailure: false });
   const [state, setState] = useState(INITIAL_STATE);
   const [query, setQuery] = useState("");
+  const gt = useGT();
   const requestId = useRef(0);
   const selectedSha = useDiffPanelStore((store) => {
     const selection = selectThreadDiffPanelSelection(store.byThreadKey, threadRef);
@@ -54,7 +56,7 @@ export function GitHistoryPanel({ threadRef, cwd }: { threadRef: ScopedThreadRef
         setState((current) => ({
           ...current,
           loading: false,
-          error: error instanceof Error ? error.message : "Could not read the commit history.",
+          error: error instanceof Error ? error.message : gt("Could not read the commit history."),
         }));
         return;
       }
@@ -105,14 +107,14 @@ export function GitHistoryPanel({ threadRef, cwd }: { threadRef: ScopedThreadRef
       <div className="flex shrink-0 items-center gap-1.5 border-b border-border/60 px-2 py-1.5">
         <GitBranchIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="max-w-[40%] shrink-0 truncate text-xs">
-          {branch ?? head?.shortSha ?? "History"}
+          {branch ?? head?.shortSha ?? gt("History", { $context: "git commit history panel" })}
         </span>
         <div className="min-w-0 flex-1">
           <Input
             type="search"
             size="compact"
-            aria-label="Search commits"
-            placeholder="Search loaded commits"
+            aria-label={gt("Search commits")}
+            placeholder={gt("Search loaded commits")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -126,7 +128,7 @@ export function GitHistoryPanel({ threadRef, cwd }: { threadRef: ScopedThreadRef
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label="Refresh history"
+          aria-label={gt("Refresh history")}
           disabled={state.loading}
           onClick={() => load(0)}
         >
@@ -140,10 +142,12 @@ export function GitHistoryPanel({ threadRef, cwd }: { threadRef: ScopedThreadRef
       ) : null}
       {state.commits.length === 0 ? (
         <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-          {state.loading ? "Loading history…" : state.error ? null : "No commits yet"}
+          {state.loading ? gt("Loading history…") : state.error ? null : gt("No commits yet")}
         </p>
       ) : items.length === 0 ? (
-        <p className="px-3 py-4 text-center text-xs text-muted-foreground">No matching commits</p>
+        <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+          <T>No matching commits</T>
+        </p>
       ) : (
         <LegendList
           data={items}

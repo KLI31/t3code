@@ -1,5 +1,6 @@
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { createFileRoute } from "@tanstack/react-router";
+import { T, useGT } from "gt-react";
 import { useEffect, useState } from "react";
 
 import { sortScopedProjectsForSidebar } from "../components/Sidebar.logic";
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/quick-composer")({
 });
 
 function QuickComposerRoute() {
+  const gt = useGT();
   const bridge = window.desktopBridge?.quickComposer;
   const projects = useProjects();
   const threads = useThreadShells();
@@ -61,7 +63,11 @@ function QuickComposerRoute() {
         id={PROMPT_ID}
         rows={3}
         autoFocus
-        placeholder={project ? `Start a thread in ${project.title}…` : "Loading projects…"}
+        placeholder={
+          project
+            ? gt("Start a thread in {project}…", { project: project.title })
+            : gt("Loading projects…")
+        }
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
         onKeyDown={(event) => {
@@ -74,7 +80,7 @@ function QuickComposerRoute() {
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
         {/* Native select: its list may extend past this small window. */}
         <select
-          aria-label="Project"
+          aria-label={gt("Project", { $context: "noun, project picker" })}
           className="min-w-0 max-w-80 truncate rounded-md border border-input bg-background px-2 py-1 text-foreground"
           value={project ? keyOf(project) : ""}
           disabled={choices.length === 0}
@@ -87,7 +93,10 @@ function QuickComposerRoute() {
           ))}
         </select>
         <span className="flex shrink-0 items-center gap-1">
-          <Kbd>Enter</Kbd> send <Kbd>Esc</Kbd> close
+          <Kbd>Enter</Kbd>
+          <T context="keyboard hint, Enter sends the prompt">send</T>
+          <Kbd>Esc</Kbd>
+          <T context="keyboard hint, Esc closes the window">close</T>
         </span>
       </div>
     </main>

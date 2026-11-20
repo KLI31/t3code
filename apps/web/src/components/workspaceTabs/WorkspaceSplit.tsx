@@ -1,6 +1,7 @@
 import { parseScopedThreadKey, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
+import { T, useGT } from "gt-react";
 import { Maximize2Icon, XIcon } from "lucide-react";
 import {
   useRef,
@@ -42,6 +43,7 @@ export function useShowThreadInMain() {
 
 /** The routed thread, plus an optional second thread beside or under it with a snapping handle. */
 export function WorkspaceSplit({ children }: { children: ReactNode }) {
+  const gt = useGT();
   const split = useWorkspaceTabsStore((state) => state.split);
   const setSplitRatio = useWorkspaceTabsStore((state) => state.setSplitRatio);
   const routeTarget = useThreadRouteTarget();
@@ -88,7 +90,7 @@ export function WorkspaceSplit({ children }: { children: ReactNode }) {
           <div
             role="separator"
             tabIndex={0}
-            aria-label="Resize split"
+            aria-label={gt("Resize split")}
             aria-orientation={vertical ? "horizontal" : "vertical"}
             aria-valuenow={Math.round(shown.ratio * 100)}
             onPointerDown={(event) => {
@@ -137,6 +139,7 @@ export function WorkspaceSplit({ children }: { children: ReactNode }) {
 }
 
 function WorkspaceSplitPane({ splitKey }: { splitKey: string }) {
+  const gt = useGT();
   const threadRef = parseScopedThreadKey(splitKey);
   const shell = useQuietThreadShell(threadRef);
   const snapshotLoaded = useEnvironmentShellHasSnapshot(threadRef?.environmentId ?? null);
@@ -159,18 +162,18 @@ function WorkspaceSplitPane({ splitKey }: { splitKey: string }) {
     <SidebarInset data-side-chat-pane className="min-h-0 overflow-hidden">
       <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border pr-1 pl-3">
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
-          {shell?.title ?? "Thread"}
+          {shell?.title ?? gt("Thread", { $context: "noun, fallback title for a conversation" })}
         </span>
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label="Open in main pane"
+          aria-label={gt("Open in main pane")}
           disabled={!threadRef}
           onClick={() => threadRef && showThreadInMain(threadRef)}
         >
           <Maximize2Icon />
         </Button>
-        <Button variant="ghost" size="icon-xs" aria-label="Close split" onClick={closeSplit}>
+        <Button variant="ghost" size="icon-xs" aria-label={gt("Close split")} onClick={closeSplit}>
           <XIcon />
         </Button>
       </div>
@@ -184,7 +187,9 @@ function WorkspaceSplitPane({ splitKey }: { splitKey: string }) {
           />
         </BackgroundThreadContext>
       ) : snapshotLoaded ? (
-        <p className="p-3 text-xs text-muted-foreground">This thread is no longer available.</p>
+        <p className="p-3 text-xs text-muted-foreground">
+          <T>This thread is no longer available.</T>
+        </p>
       ) : null}
     </SidebarInset>
   );

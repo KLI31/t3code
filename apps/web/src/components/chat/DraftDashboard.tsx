@@ -1,6 +1,7 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { useNavigate } from "@tanstack/react-router";
+import { T, useGT } from "gt-react";
 import { CalendarDaysIcon, HistoryIcon, SquareActivityIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -63,6 +64,7 @@ function Delta({ current, previous }: { current: number; previous: number }) {
 
 export function DraftDashboard() {
   const navigate = useNavigate();
+  const gt = useGT();
   const threads = useVisibleThreadShells();
   const nowMs = Date.parse(useNowMinute());
   const data = deriveDraftDashboard(threads, nowMs);
@@ -79,7 +81,11 @@ export function DraftDashboard() {
 
   return (
     <div className="grid grid-cols-3 gap-3 pt-6 pb-10">
-      <Card icon={<SquareActivityIcon />} title="Activity" className="col-span-2">
+      <Card
+        icon={<SquareActivityIcon />}
+        title={gt("Activity", { $context: "dashboard card heading, recent session activity" })}
+        className="col-span-2"
+      >
         <div className="grid grid-flow-col grid-rows-7 gap-0.75" aria-hidden>
           {data.activity.map((count, index) => (
             <span
@@ -92,7 +98,10 @@ export function DraftDashboard() {
         </div>
         <p className="flex justify-between text-xs text-muted-foreground tabular-nums">
           <span>
-            {data.activityTotal} sessions · {data.pullRequests.length} PRs linked
+            {gt(
+              "{sessions, plural, one {{sessions} session} other {{sessions} sessions}} · {prs, plural, one {{prs} PR linked} other {{prs} PRs linked}}",
+              { sessions: data.activityTotal, prs: data.pullRequests.length },
+            )}
           </span>
           <span>
             {monthFormat.format(firstWeekStart)} – {monthFormat.format(nowMs)}
@@ -100,7 +109,7 @@ export function DraftDashboard() {
         </p>
       </Card>
 
-      <Card icon={<HistoryIcon />} title="Recent sessions">
+      <Card icon={<HistoryIcon />} title={gt("Recent sessions")}>
         <ul className="flex flex-col gap-2">
           {data.recent.slice(0, RECENT_LIMIT).map((thread) => (
             <li key={`${thread.environmentId}:${thread.id}`}>
@@ -119,14 +128,20 @@ export function DraftDashboard() {
         </ul>
         {data.recent.length > RECENT_LIMIT ? (
           <p className="mt-auto text-xs text-muted-foreground">
-            {data.recent.length - RECENT_LIMIT} more
+            {gt("{count} more", { count: data.recent.length - RECENT_LIMIT })}
           </p>
         ) : null}
       </Card>
 
-      <Card icon={<PullRequestGlyph.pullRequest />} title="Pull requests" className="col-span-2">
+      <Card
+        icon={<PullRequestGlyph.pullRequest />}
+        title={gt("Pull requests")}
+        className="col-span-2"
+      >
         {data.pullRequests.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No pull requests linked to threads yet.</p>
+          <p className="text-sm text-muted-foreground">
+            <T>No pull requests linked to threads yet.</T>
+          </p>
         ) : (
           <ul className="flex flex-col gap-2.5">
             {data.pullRequests.slice(0, PULL_REQUEST_LIMIT).map(({ link, thread, at }) => {
@@ -161,22 +176,26 @@ export function DraftDashboard() {
         )}
         {data.pullRequests.length > PULL_REQUEST_LIMIT ? (
           <p className="mt-auto text-xs text-muted-foreground">
-            {data.pullRequests.length - PULL_REQUEST_LIMIT} more
+            {gt("{count} more", { count: data.pullRequests.length - PULL_REQUEST_LIMIT })}
           </p>
         ) : null}
       </Card>
 
-      <Card icon={<CalendarDaysIcon />} title="This month">
+      <Card icon={<CalendarDaysIcon />} title={gt("This month")}>
         <dl className="flex flex-col gap-3">
           <div>
-            <dt className="text-xs text-muted-foreground">Sessions</dt>
+            <dt className="text-xs text-muted-foreground">
+              <T>Sessions</T>
+            </dt>
             <dd className="flex items-baseline gap-2">
               <span className="text-2xl font-medium tabular-nums">{data.sessionsThisMonth}</span>
               <Delta current={data.sessionsThisMonth} previous={data.sessionsLastMonth} />
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-foreground">PRs merged</dt>
+            <dt className="text-xs text-muted-foreground">
+              <T>PRs merged</T>
+            </dt>
             <dd className="flex items-baseline gap-2">
               <span className="text-2xl font-medium tabular-nums">{data.mergedThisMonth}</span>
               <Delta current={data.mergedThisMonth} previous={data.mergedLastMonth} />

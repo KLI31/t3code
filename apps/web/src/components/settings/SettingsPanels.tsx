@@ -1228,12 +1228,17 @@ export function GeneralSettingsPanel() {
         />
       </SettingsSection>
 
-      <SettingsSection id="notes" title="Notes">
+      <SettingsSection
+        id="notes"
+        title={gt("Notes", { $context: "settings section for the notes vault" })}
+      >
         <SettingsRow
           serverScoped
           settingKeys={["notesVaultPath"]}
           {...setting("notes-vault-folder")}
-          description="An Obsidian vault or any folder of Markdown notes on this environment's machine. Leave empty to turn Notes off."
+          description={gt(
+            "An Obsidian vault or any folder of Markdown notes on this environment's machine. Leave empty to turn Notes off.",
+          )}
           resetAction={
             settings.notesVaultPath !== DEFAULT_UNIFIED_SETTINGS.notesVaultPath ? (
               <SettingResetButton
@@ -1251,9 +1256,13 @@ export function GeneralSettingsPanel() {
               value={mixedNotesVaultPath ? "" : settings.notesVaultPath}
               onCommit={(next) => updateSettings({ notesVaultPath: next })}
               normalizeDraft={resolvePastedPath}
-              placeholder={mixedNotesVaultPath ? "Mixed" : "~/Obsidian/Vault"}
+              placeholder={
+                mixedNotesVaultPath
+                  ? gt("Mixed", { $context: "values differ across targets" })
+                  : "~/Obsidian/Vault"
+              }
               spellCheck={false}
-              aria-label="Notes vault folder"
+              aria-label={gt("Notes vault folder")}
             />
           }
         />

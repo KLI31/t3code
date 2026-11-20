@@ -202,6 +202,7 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
 }
 
 function ContinueOnActions({ targets }: { targets: ReadonlyArray<ContinueOnTarget> }) {
+  const gt = useGT();
   const [pendingId, setPendingId] = useState<string | null>(null);
   async function select(target: ContinueOnTarget) {
     setPendingId(target.instanceId);
@@ -210,8 +211,8 @@ function ContinueOnActions({ targets }: { targets: ReadonlyArray<ContinueOnTarge
     } catch (cause) {
       toastManager.add({
         type: "error",
-        title: `Could not continue on ${target.label}`,
-        description: cause instanceof Error ? cause.message : "An error occurred.",
+        title: m(msg("Could not continue on {provider}", { provider: target.label })),
+        description: cause instanceof Error ? cause.message : m(msg("An error occurred.")),
       });
     }
     setPendingId(null);
@@ -225,7 +226,9 @@ function ContinueOnActions({ targets }: { targets: ReadonlyArray<ContinueOnTarge
           disabled={pendingId !== null}
           onClick={() => void select(target)}
         >
-          {pendingId === target.instanceId ? "Continuing..." : `Continue on ${target.label}`}
+          {pendingId === target.instanceId
+            ? gt("Continuing...")
+            : gt("Continue on {provider}", { provider: target.label })}
         </InlineButton>
       ))}
     </span>

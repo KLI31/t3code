@@ -56,7 +56,9 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
       <MenuPopup align="start" {...composerFloatingLayerProps}>
         {props.showInteractionModeToggle ? (
           <>
-            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Mode</div>
+            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+              {gt("Mode", { $context: "composer interaction mode heading" })}
+            </div>
             <MenuRadioGroup
               value={props.interactionMode}
               onValueChange={(value) => {
@@ -64,8 +66,12 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
                 props.onToggleInteractionMode();
               }}
             >
-              <MenuRadioItem value="default">Chat</MenuRadioItem>
-              <MenuRadioItem value="plan">Plan</MenuRadioItem>
+              <MenuRadioItem value="default">
+                {gt("Chat", { $context: "composer interaction mode" })}
+              </MenuRadioItem>
+              <MenuRadioItem value="plan">
+                {gt("Plan", { $context: "composer interaction mode" })}
+              </MenuRadioItem>
             </MenuRadioGroup>
             {props.showPermissions !== false ? <MenuDivider /> : null}
           </>
