@@ -28,7 +28,11 @@ export function SidebarProjectsSection<P extends SidebarProjectsSectionProject>(
   onToggle: (projectKey: string) => void;
   onAddProject: () => void;
   onNewWorkspace: (project: P) => void;
-  onProjectContextMenu: (project: P, position: { x: number; y: number }) => void;
+  onProjectContextMenu: (
+    project: P,
+    position: { x: number; y: number },
+    source: "keyboard" | "mouse",
+  ) => void;
 }) {
   if (projects.length === 0) return null;
   // Keep a scoped project visible even when it sits past the fold.
@@ -62,7 +66,7 @@ export function SidebarProjectsSection<P extends SidebarProjectsSectionProject>(
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  onProjectContextMenu(project, { x: event.clientX, y: event.clientY });
+                  onProjectContextMenu(project, { x: event.clientX, y: event.clientY }, "mouse");
                 }}
                 className={cn(
                   "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm font-medium outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",

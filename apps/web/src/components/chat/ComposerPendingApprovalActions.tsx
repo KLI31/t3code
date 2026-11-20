@@ -3,6 +3,7 @@ import {
   type ProviderApprovalOption,
   type RuntimeRequestId,
 } from "@t3tools/contracts";
+import { msg, useGT, useMessages } from "gt-react";
 import { memo } from "react";
 import {
   CheckCheckIcon,
@@ -30,10 +31,19 @@ interface ComposerPendingApprovalActionsProps {
 }
 
 const DEFAULT_APPROVAL_OPTIONS = [
-  { decision: "cancel", label: "Cancel" },
-  { decision: "decline", label: "Decline" },
-  { decision: "acceptForSession", label: "Always allow this session" },
-  { decision: "accept", label: "Approve" },
+  {
+    decision: "cancel",
+    label: msg("Cancel", { $context: "verb, response to an approval request" }),
+  },
+  {
+    decision: "decline",
+    label: msg("Decline", { $context: "verb, response to an approval request" }),
+  },
+  { decision: "acceptForSession", label: msg("Always allow this session") },
+  {
+    decision: "accept",
+    label: msg("Approve", { $context: "verb, response to an approval request" }),
+  },
 ] satisfies ReadonlyArray<ProviderApprovalOption>;
 
 // Approve first, then the standing grants, then Decline; anything else (Cancel) waits in the menu.
@@ -60,6 +70,10 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
   options = DEFAULT_APPROVAL_OPTIONS,
   onRespondToApproval,
 }: ComposerPendingApprovalActionsProps) {
+  const gt = useGT();
+  const m = useMessages();
+  // Provider options carry server-authored labels; only the built-in defaults are translated.
+  const optionLabel = (label: string) => (options === DEFAULT_APPROVAL_OPTIONS ? m(label) : label);
   const blocked = disabled || isResponding || !canRespond;
   const respond = (decision: ProviderApprovalDecision) => {
     if (!blocked) void onRespondToApproval(requestId, decision);
@@ -83,7 +97,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             onClick={() => respond(option.decision)}
           >
             <Icon aria-hidden />
-            <span className="max-w-56 truncate">{option.label}</span>
+            <span className="max-w-56 truncate">{optionLabel(option.label)}</span>
           </Button>
         );
         return option.warning ? (
@@ -99,7 +113,9 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
         <Menu>
           <MenuTrigger
             disabled={blocked}
-            render={<Button size="icon-xs" variant="ghost" aria-label="More approval options" />}
+            render={
+              <Button size="icon-xs" variant="ghost" aria-label={gt("More approval options")} />
+            }
           >
             <EllipsisIcon />
           </MenuTrigger>
@@ -112,7 +128,9 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
                 onClick={() => respond(option.decision)}
               >
                 {option.warning ? <TriangleAlertIcon className="size-3 text-warning" /> : null}
-                <span className="min-w-0 whitespace-normal wrap-break-word">{option.label}</span>
+                <span className="min-w-0 whitespace-normal wrap-break-word">
+                  {optionLabel(option.label)}
+                </span>
               </MenuItem>
             ))}
           </MenuPopup>

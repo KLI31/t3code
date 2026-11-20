@@ -5,11 +5,8 @@ import type {
   UsageLimitSourceSnapshots,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import {
-  collectProviderUsageLimits,
-  formatDuration,
-  remainingPercent,
-} from "@t3tools/shared/usageLimits";
+import { collectProviderUsageLimits, remainingPercent } from "@t3tools/shared/usageLimits";
+import { formatDuration } from "@t3tools/shared/usageLimitsCopy";
 import { Link } from "@tanstack/react-router";
 import { RefreshCwIcon, SquareTerminalIcon } from "lucide-react";
 import { useState } from "react";

@@ -6,6 +6,7 @@ import {
   type ChatBackgroundScope,
 } from "@t3tools/contracts/settings";
 import type { CSSProperties } from "react";
+import { useGT } from "gt-react";
 
 import {
   removeChatBackgroundImage,
@@ -16,7 +17,7 @@ import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 const EFFECT_LABELS: Record<ChatBackgroundEffect, string> = {
@@ -40,6 +41,8 @@ const reportError = (title: string, error: unknown) =>
   });
 
 export function ChatBackgroundSettings() {
+  const gt = useGT();
+  const searchableSetting = useSearchableSetting();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const preview = useChatBackgroundUrl(settings.chatBackgroundEffect, false);
@@ -100,7 +103,7 @@ export function ChatBackgroundSettings() {
         resetAction={
           settings.chatBackgroundEffect !== DEFAULT_UNIFIED_SETTINGS.chatBackgroundEffect ? (
             <SettingResetButton
-              label="background effect"
+              ariaLabel={gt("Reset background effect to default")}
               onClick={() =>
                 updateSettings({
                   chatBackgroundEffect: DEFAULT_UNIFIED_SETTINGS.chatBackgroundEffect,
@@ -139,7 +142,7 @@ export function ChatBackgroundSettings() {
         resetAction={
           settings.chatBackgroundScope !== DEFAULT_UNIFIED_SETTINGS.chatBackgroundScope ? (
             <SettingResetButton
-              label="background scope"
+              ariaLabel={gt("Reset background scope to default")}
               onClick={() =>
                 updateSettings({
                   chatBackgroundScope: DEFAULT_UNIFIED_SETTINGS.chatBackgroundScope,
@@ -175,7 +178,7 @@ export function ChatBackgroundSettings() {
         resetAction={
           settings.chatBackgroundOpacity !== DEFAULT_UNIFIED_SETTINGS.chatBackgroundOpacity ? (
             <SettingResetButton
-              label="background visibility"
+              ariaLabel={gt("Reset background visibility to default")}
               onClick={() =>
                 updateSettings({
                   chatBackgroundOpacity: DEFAULT_UNIFIED_SETTINGS.chatBackgroundOpacity,

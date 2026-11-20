@@ -144,6 +144,7 @@ function WorkspaceSplitPane({ splitKey }: { splitKey: string }) {
   const showThreadInMain = useShowThreadInMain();
   // The embedded pane has no panel or terminal drawer, so those open with it in the main pane.
   const parentPanel: SideChatParentPanel | null = threadRef && {
+    hostRef: threadRef,
     openToolDiff: (target) => {
       useDiffPanelStore.getState().selectToolCall(threadRef, target);
       useRightPanelStore.getState().open(threadRef, "diff");

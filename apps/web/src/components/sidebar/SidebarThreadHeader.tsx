@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useGT } from "gt-react";
 import { SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -87,33 +88,41 @@ export function SidebarThreadHeader({
 }: SidebarThreadHeaderProps) {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const paletteShortcut = shortcutLabelForCommand(keybindings, "commandPalette.toggle");
+  const gt = useGT();
   const resultsVisible = isSearching && searchResultCount > 0;
   // Shrinking results can remove the active option; never leave aria-activedescendant pointing at it.
   const activeResultExists = resultsVisible && activeSearchResultIndex < searchResultCount;
   const newThreadLabel = newThreadShortcutLabel
-    ? `New thread (${newThreadShortcutLabel})`
-    : "New thread";
+    ? gt("New thread ({shortcut})", { shortcut: newThreadShortcutLabel })
+    : gt("New thread");
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex h-8 min-w-0 items-center gap-1">
         <div className="flex min-w-0 flex-1">{projectSwitcher}</div>
         <HeaderIconButton
-          label="Search everything"
-          tooltip={paletteShortcut ? `Search everything (${paletteShortcut})` : "Search everything"}
+          label={gt("Search everything")}
+          tooltip={
+            paletteShortcut
+              ? gt("Search everything ({shortcut})", { shortcut: paletteShortcut })
+              : gt("Search everything")
+          }
           onClick={() => openCommandPalette()}
         >
           <SearchIcon />
         </HeaderIconButton>
         <HeaderIconButton
-          label="New thread"
+          label={gt("New thread")}
           tooltip={
             showNewThreadInProjectHint ? (
               <span className="flex flex-col gap-0.5">
                 <span>{newThreadLabel}</span>
                 <span className="text-muted-foreground">
-                  New thread in current project: Shift+click
-                  {newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}
+                  {newThreadInProjectShortcutLabel
+                    ? gt("New thread in current project: Shift+click ({shortcut})", {
+                        shortcut: newThreadInProjectShortcutLabel,
+                      })
+                    : gt("New thread in current project: Shift+click")}
                 </span>
               </span>
             ) : (
@@ -135,8 +144,8 @@ export function SidebarThreadHeader({
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.currentTarget.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder="Search"
-          aria-label="Search threads"
+          placeholder={gt("Search", { $context: "search field placeholder" })}
+          aria-label={gt("Search threads")}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={resultsVisible}
@@ -154,7 +163,7 @@ export function SidebarThreadHeader({
             size="icon-micro"
             variant="ghost-muted"
             className="shrink-0"
-            aria-label="Clear thread search"
+            aria-label={gt("Clear thread search")}
             onClick={() => {
               onClearSearch();
               searchInputRef.current?.focus();
