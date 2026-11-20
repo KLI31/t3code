@@ -1,3 +1,4 @@
+import { useGT } from "gt-react";
 import { GitBranchPlusIcon, PlusIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
@@ -28,20 +29,25 @@ export function SidebarProjectsSection<P extends SidebarProjectsSectionProject>(
   onToggle: (projectKey: string) => void;
   onAddProject: () => void;
   onNewWorkspace: (project: P) => void;
-  onProjectContextMenu: (project: P, position: { x: number; y: number }) => void;
+  onProjectContextMenu: (
+    project: P,
+    position: { x: number; y: number },
+    source: "keyboard" | "mouse",
+  ) => void;
 }) {
+  const gt = useGT();
   if (projects.length === 0) return null;
   // Keep a scoped project visible even when it sits past the fold.
   const shown = projects.filter(
     (project, index) => index < VISIBLE_PROJECTS || scopedKeys.includes(project.projectKey),
   );
   return (
-    <section aria-label="Projects" className="flex flex-col pb-3">
+    <section aria-label={gt("Projects")} className="flex flex-col pb-3">
       <div className="flex h-7 items-center gap-1 px-2 text-xs font-medium text-sidebar-muted-foreground">
-        <span className="flex-1">Projects</span>
+        <span className="flex-1">{gt("Projects")}</span>
         <button
           type="button"
-          aria-label="Add project"
+          aria-label={gt("Add project")}
           onClick={onAddProject}
           className="-mr-0.5 grid size-5 place-items-center rounded-md outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
@@ -62,7 +68,7 @@ export function SidebarProjectsSection<P extends SidebarProjectsSectionProject>(
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  onProjectContextMenu(project, { x: event.clientX, y: event.clientY });
+                  onProjectContextMenu(project, { x: event.clientX, y: event.clientY }, "mouse");
                 }}
                 className={cn(
                   "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm font-medium outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
@@ -81,14 +87,18 @@ export function SidebarProjectsSection<P extends SidebarProjectsSectionProject>(
                       <Button
                         size="icon-xs"
                         variant="ghost-muted"
-                        aria-label={`New workspace in ${project.displayName}`}
+                        aria-label={gt("New workspace in {project}", {
+                          project: project.displayName,
+                        })}
                         onClick={() => onNewWorkspace(project)}
                       />
                     }
                   >
                     <GitBranchPlusIcon aria-hidden />
                   </TooltipTrigger>
-                  <TooltipPopup>New workspace in {project.displayName}</TooltipPopup>
+                  <TooltipPopup>
+                    {gt("New workspace in {project}", { project: project.displayName })}
+                  </TooltipPopup>
                 </Tooltip>
               </span>
             </li>
@@ -97,7 +107,7 @@ export function SidebarProjectsSection<P extends SidebarProjectsSectionProject>(
       </ul>
       {projects.length > shown.length ? (
         <p className="px-2 pt-1 text-xs text-sidebar-muted-foreground">
-          {projects.length - shown.length} more in All projects
+          {gt("{count} more in All projects", { count: projects.length - shown.length })}
         </p>
       ) : null}
     </section>

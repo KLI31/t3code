@@ -6,6 +6,7 @@ import {
   StickyNoteIcon,
   ZapIcon,
 } from "lucide-react";
+import { T, useGT } from "gt-react";
 import { memo } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
@@ -19,7 +20,7 @@ import {
 } from "../../navigationHistory";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
-import { usePullRequestsSupported } from "../../state/environments";
+import { useIssuesSupported, usePullRequestsSupported } from "../../state/environments";
 import { APP_BASE_NAME } from "../../branding";
 import {
   resolveEnvironmentIdentificationPillLabel,
@@ -39,6 +40,8 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import { readIssueListPreferences } from "../issue/issueListPreferences";
+import { IssueGlyph } from "../issue/issuePresentation";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SpotifyMiniPlayer } from "../../spotify/SpotifyMiniPlayer";
@@ -54,6 +57,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
+  const gt = useGT();
   const backdropVariant = resolveSidebarStageBackdropVariant(
     stageLabel,
     environmentIdentificationMode,
@@ -75,7 +79,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         <SidebarTrigger
           variant={backdropVariant ? "media-navigation" : "ghost"}
           className="relative top-auto translate-y-0"
-          aria-label="Toggle main sidebar"
+          aria-label={gt("Toggle main sidebar")}
         />
       </div>
       <div className="relative z-10 flex h-8 min-w-0 flex-1 flex-wrap content-start items-center gap-x-2 overflow-hidden py-0.5">
@@ -132,7 +136,8 @@ function HistoryNavigationButton({
 }) {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const enabled = useCanNavigateHistory(direction);
-  const label = direction === "back" ? "Go back" : "Go forward";
+  const gt = useGT();
+  const label = direction === "back" ? gt("Go back") : gt("Go forward");
   const shortcutLabel = shortcutLabelForCommand(
     keybindings,
     direction === "back" ? "navigation.back" : "navigation.forward",
@@ -185,6 +190,7 @@ export function SidebarPrimaryNavItems() {
   const { isMobile, setOpenMobile } = useSidebar();
   const pathname = useLocation({ select: (location) => location.pathname });
   const pullRequestsSupported = usePullRequestsSupported();
+  const issuesSupported = useIssuesSupported();
   const go = (open: () => void) => {
     if (isMobile) setOpenMobile(false);
     open();
@@ -205,7 +211,25 @@ export function SidebarPrimaryNavItems() {
             }
           >
             <PullRequestGlyph.pullRequest />
-            <span>Pull requests</span>
+            <span>
+              <T>Pull requests</T>
+            </span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ) : null}
+      {issuesSupported ? (
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            type="button"
+            isActive={pathname.startsWith("/issues")}
+            onClick={() =>
+              go(() => void navigate({ to: "/issues", search: readIssueListPreferences() }))
+            }
+          >
+            <IssueGlyph.issue />
+            <span>
+              <T context="sidebar link to the list of issues">Issues</T>
+            </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ) : null}
@@ -216,7 +240,9 @@ export function SidebarPrimaryNavItems() {
           onClick={() => go(() => void navigate({ to: "/usage" }))}
         >
           <ChartNoAxesColumnIcon />
-          <span>Usage</span>
+          <span>
+            <T>Usage</T>
+          </span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>
@@ -226,7 +252,9 @@ export function SidebarPrimaryNavItems() {
           onClick={() => go(() => void navigate({ to: "/notes" }))}
         >
           <StickyNoteIcon />
-          <span>Notes</span>
+          <span>
+            <T>Notes</T>
+          </span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>
@@ -236,7 +264,9 @@ export function SidebarPrimaryNavItems() {
           onClick={() => go(() => void navigate({ to: "/settings/scheduled-tasks" }))}
         >
           <ZapIcon />
-          <span>Automations</span>
+          <span>
+            <T>Automations</T>
+          </span>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </>
@@ -271,12 +301,16 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         {isOnUtilityPage ? (
           <SidebarMenuButton onClick={handleBackClick}>
             <ArrowLeftIcon />
-            <span>Back</span>
+            <span>
+              <T>Back</T>
+            </span>
           </SidebarMenuButton>
         ) : (
           <SidebarMenuButton onClick={handleSettingsClick}>
             <SettingsIcon />
-            <span>Settings</span>
+            <span>
+              <T>Settings</T>
+            </span>
           </SidebarMenuButton>
         )}
       </SidebarMenuItem>

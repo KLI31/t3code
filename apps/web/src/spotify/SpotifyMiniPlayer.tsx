@@ -1,4 +1,5 @@
 import { LogOutIcon, PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "lucide-react";
+import { T, useGT } from "gt-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "../components/ui/button";
@@ -28,6 +29,7 @@ export function SpotifyMiniPlayer() {
   const connected = useSyncExternalStore(subscribeSpotifyConnection, isSpotifyConnected);
   const [nowPlaying, setNowPlaying] = useState<SpotifyNowPlaying | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const gt = useGT();
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- polls Spotify's playback state, an external system, while the window is visible
   useEffect(() => {
@@ -61,12 +63,12 @@ export function SpotifyMiniPlayer() {
         onClick={() => {
           setConnecting(true);
           connectSpotify()
-            .catch((error: unknown) => reportError("Could not connect Spotify", error))
+            .catch((error: unknown) => reportError(gt("Could not connect Spotify"), error))
             .finally(() => setConnecting(false));
         }}
       >
         <SpotifyGlyph />
-        {connecting ? "Waiting for Spotify…" : "Connect Spotify"}
+        {connecting ? <T>Waiting for Spotify…</T> : <T>Connect Spotify</T>}
       </Button>
     );
   }
@@ -81,6 +83,7 @@ export function SpotifyMiniPlayer() {
       .then(setNowPlaying)
       .catch((error: unknown) => {
         setNowPlaying(previous);
+        // oxlint-disable-next-line t3code/no-untranslated-copy -- product name
         reportError("Spotify", error);
       });
   };
@@ -97,9 +100,10 @@ export function SpotifyMiniPlayer() {
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-xs font-medium text-sidebar-foreground">
           {nowPlaying?.isPlaying ? <PlayingBars /> : null}
-          <span className="truncate">{nowPlaying?.title ?? "Nothing playing"}</span>
+          <span className="truncate">{nowPlaying?.title ?? gt("Nothing playing")}</span>
         </p>
         <p className="truncate text-xs text-sidebar-muted-foreground">
+          {/* oxlint-disable-next-line t3code/no-untranslated-copy -- product name */}
           {nowPlaying?.artist ?? "Spotify"}
         </p>
       </div>
@@ -108,7 +112,7 @@ export function SpotifyMiniPlayer() {
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Previous"
+            aria-label={gt("Previous", { $context: "media control, previous track" })}
             onClick={() => control("previous")}
           >
             <SkipBackIcon />
@@ -116,7 +120,11 @@ export function SpotifyMiniPlayer() {
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label={nowPlaying.isPlaying ? "Pause" : "Play"}
+            aria-label={
+              nowPlaying.isPlaying
+                ? gt("Pause", { $context: "media control" })
+                : gt("Play", { $context: "media control" })
+            }
             onClick={() => control(nowPlaying.isPlaying ? "pause" : "play")}
           >
             {nowPlaying.isPlaying ? <PauseIcon /> : <PlayIcon />}
@@ -124,7 +132,7 @@ export function SpotifyMiniPlayer() {
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Next"
+            aria-label={gt("Next", { $context: "media control, next track" })}
             onClick={() => control("next")}
           >
             <SkipForwardIcon />
@@ -135,8 +143,8 @@ export function SpotifyMiniPlayer() {
         <Button
           size="icon-xs"
           variant="ghost-muted"
-          aria-label="Disconnect Spotify"
-          title="Disconnect Spotify"
+          aria-label={gt("Disconnect Spotify")}
+          title={gt("Disconnect Spotify")}
           onClick={() => {
             disconnectSpotify();
             setNowPlaying(null);

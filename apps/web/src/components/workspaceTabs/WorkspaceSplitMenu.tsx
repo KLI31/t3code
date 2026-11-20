@@ -1,4 +1,5 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+import { T, useGT } from "gt-react";
 import { Columns2Icon, Rows2Icon, XIcon } from "lucide-react";
 
 import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
@@ -8,6 +9,7 @@ import { neighborTabKey, parseWorkspaceTab, useWorkspaceTabsStore } from "./work
 
 /** The split view control beside the panel toggles: opens the nearest thread tab beside or under this one. */
 export function WorkspaceSplitMenu() {
+  const gt = useGT();
   const routeTarget = useThreadRouteTarget();
   const keys = useWorkspaceTabsStore((state) => state.keys);
   const splitKey = useWorkspaceTabsStore((state) => state.split?.key ?? null);
@@ -30,7 +32,7 @@ export function WorkspaceSplitMenu() {
           <Toggle
             className="shrink-0 [-webkit-app-region:no-drag]"
             pressed={splitShown}
-            aria-label="Split view"
+            aria-label={gt("Split view")}
             variant="ghost"
             size="sm"
           />
@@ -42,17 +44,17 @@ export function WorkspaceSplitMenu() {
         {splitShown ? (
           <MenuItem onClick={closeSplit}>
             <XIcon />
-            Close split
+            <T>Close split</T>
           </MenuItem>
         ) : candidate ? (
           <>
             <MenuItem onClick={() => openSplit(candidate, "right")}>
               <Columns2Icon />
-              Split right
+              <T>Split right</T>
             </MenuItem>
             <MenuItem onClick={() => openSplit(candidate, "down")}>
               <Rows2Icon />
-              Split down
+              <T>Split down</T>
             </MenuItem>
           </>
         ) : null}

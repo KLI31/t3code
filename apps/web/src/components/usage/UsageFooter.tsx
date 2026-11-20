@@ -5,16 +5,15 @@ import type {
   UsageLimitSourceSnapshots,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import {
-  collectProviderUsageLimits,
-  formatDuration,
-  remainingPercent,
-} from "@t3tools/shared/usageLimits";
+import { collectProviderUsageLimits, remainingPercent } from "@t3tools/shared/usageLimits";
+import { formatDuration } from "@t3tools/shared/usageLimitsCopy";
 import { Link } from "@tanstack/react-router";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { RefreshCwIcon, SquareTerminalIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useNowMinute } from "../../hooks/useNowMinute";
+import type { MessageResolver } from "../../i18n/messages";
 import { cn } from "../../lib/utils";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { primaryServerConfigAtom, serverEnvironment } from "../../state/server";
@@ -28,9 +27,9 @@ const FOOTER_BUTTON_CLASS =
   "inline-flex h-5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 text-foreground/55 outline-hidden transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
 
 const WINDOW_TITLE: Partial<Record<ServerProviderUsageWindow["kind"], string>> = {
-  session: "5-hour limit",
-  weekly: "Weekly limit",
-  monthly: "Monthly limit",
+  session: msg("5-hour limit"),
+  weekly: msg("Weekly limit"),
+  monthly: msg("Monthly limit"),
 };
 
 const EMPTY_SOURCES: UsageLimitSourceSnapshots = [];
@@ -53,16 +52,20 @@ function barClass(left: number): string {
   return "bg-foreground/45";
 }
 
-function resetLabel(window: ServerProviderUsageWindow, now: number): string | null {
+function resetLabel(
+  window: ServerProviderUsageWindow,
+  now: number,
+  resolve: MessageResolver,
+): string | null {
   const resetsAt = window.resetsAt ? Date.parse(window.resetsAt) : Number.NaN;
-  return resetsAt > now ? formatDuration(resetsAt - now) : null;
+  return resetsAt > now ? formatDuration(resetsAt - now, resolve) : null;
 }
 
-function updatedLabel(checkedAt: string, now: number): string {
+function updatedLabel(checkedAt: string, now: number, resolve: MessageResolver): string {
   const minutes = Math.max(0, Math.floor((now - Date.parse(checkedAt)) / 60_000));
-  if (!Number.isFinite(minutes) || minutes === 0) return "Updated just now";
-  if (minutes < 60) return `Updated ${minutes}m ago`;
-  return `Updated ${Math.floor(minutes / 60)}h ago`;
+  if (!Number.isFinite(minutes) || minutes === 0) return resolve(msg("Updated just now"));
+  if (minutes < 60) return resolve(msg("Updated {minutes}m ago", { minutes }));
+  return resolve(msg("Updated {hours}h ago", { hours: Math.floor(minutes / 60) }));
 }
 
 function limitsFor(
@@ -81,6 +84,7 @@ function limitsFor(
 
 /** The bar under the routed card: every agent's room left, and a terminal tab, as in monocode. */
 export function UsageFooter() {
+  const gt = useGT();
   const config = useAtomValue(primaryServerConfigAtom);
   const environmentId = usePrimaryEnvironmentId();
   const newTerminalTab = useNewTerminalTab();
@@ -106,7 +110,7 @@ export function UsageFooter() {
 
   return (
     <footer
-      aria-label="Provider usage"
+      aria-label={gt("Provider usage")}
       className="hidden h-7.5 shrink-0 items-center gap-1.5 overflow-x-auto pb-0.5 text-2xs text-foreground/55 md:flex"
     >
       {withLimits.map((provider) => (
@@ -120,7 +124,7 @@ export function UsageFooter() {
       {withLimits.length > 0 ? (
         <button
           type="button"
-          aria-label="Refresh usage"
+          aria-label={gt("Refresh usage")}
           disabled={refreshing || !environmentId}
           onClick={refresh}
           className="-ml-1 grid size-5 shrink-0 place-items-center rounded-full text-foreground/40 outline-hidden hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset disabled:opacity-50"
@@ -135,7 +139,7 @@ export function UsageFooter() {
           className={cn(FOOTER_BUTTON_CLASS, "ml-auto text-foreground/40")}
         >
           <SquareTerminalIcon aria-hidden className="size-3.5" />
-          Terminal
+          <T>Terminal</T>
         </button>
       ) : null}
     </footer>
@@ -151,6 +155,8 @@ function ProviderUsageChip({
   readonly limits: ServerProviderUsageLimits | undefined;
   readonly now: number;
 }) {
+  const gt = useGT();
+  const m = useMessages();
   const windows = limits?.windows ?? [];
   // The first session and weekly windows; model-scoped weeklies stay in the popover.
   const picked = (["session", "weekly"] as const).flatMap((kind) => {
@@ -168,7 +174,7 @@ function ProviderUsageChip({
         render={
           <button
             type="button"
-            aria-label={`${providerLabel(provider)} usage details`}
+            aria-label={gt("{provider} usage details", { provider: providerLabel(provider) })}
             className={FOOTER_BUTTON_CLASS}
           />
         }
@@ -180,7 +186,9 @@ function ProviderUsageChip({
           size="compact"
         />
         {tightest === null ? (
-          <span className="text-foreground/35">{limits?.unavailable ? "Unavailable" : "···"}</span>
+          <span className="text-foreground/35">
+            {limits?.unavailable ? gt("Unavailable", { $context: "usage limits status" }) : "···"}
+          </span>
         ) : (
           <>
             <span
@@ -196,7 +204,7 @@ function ProviderUsageChip({
               {shown.map((window, index) => (
                 <span key={window.id} className="inline-flex items-center gap-1">
                   {index > 0 ? <span className="text-foreground/25">·</span> : null}
-                  {remainingPercent(window)}% {resetLabel(window, now) ?? window.label}
+                  {remainingPercent(window)}% {resetLabel(window, now, m) ?? window.label}
                 </span>
               ))}
             </span>
@@ -209,7 +217,7 @@ function ProviderUsageChip({
             to="/usage"
             className="self-start text-3xs text-foreground/45 hover:text-foreground"
           >
-            Open usage
+            <T>Open usage</T>
           </Link>
           <div className="flex items-center gap-2.5 px-1 pt-0.5 pb-1">
             <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-foreground/6 ring-1 ring-foreground/7 ring-inset">
@@ -220,10 +228,14 @@ function ProviderUsageChip({
               />
             </span>
             <div className="min-w-0">
-              <h2 className="font-medium text-xs leading-4">{providerLabel(provider)} usage</h2>
+              <h2 className="font-medium text-xs leading-4">
+                <T>
+                  <Var>{providerLabel(provider)}</Var> usage
+                </T>
+              </h2>
               {limits ? (
                 <p className="mt-0.5 text-3xs text-foreground/40 leading-4">
-                  {limits.unavailable?.message ?? updatedLabel(limits.checkedAt, now)}
+                  {limits.unavailable?.message ?? updatedLabel(limits.checkedAt, now, m)}
                 </p>
               ) : null}
             </div>
@@ -244,21 +256,25 @@ function UsageWindowCard({
   readonly window: ServerProviderUsageWindow;
   readonly now: number;
 }) {
+  const gt = useGT();
+  const m = useMessages();
   const left = remainingPercent(window);
   const title = window.label.includes("·")
     ? window.label
-    : (WINDOW_TITLE[window.kind] ?? window.label);
-  const reset = resetLabel(window, now);
+    : m(WINDOW_TITLE[window.kind] ?? window.label);
+  const reset = resetLabel(window, now, m);
   return (
     <section className="rounded-lg bg-foreground/4.5 px-3 py-2.5 ring-1 ring-foreground/6 ring-inset">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="font-medium text-2xs text-foreground/65">{title}</h3>
-        <span className="shrink-0 font-medium text-2xs tabular-nums">{left}% remaining</span>
+        <span className="shrink-0 font-medium text-2xs tabular-nums">
+          {gt("{left}% remaining", { left })}
+        </span>
       </div>
       <div
         className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10"
         role="progressbar"
-        aria-label={`${title} remaining`}
+        aria-label={gt("{title} remaining", { title })}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={left}
@@ -269,9 +285,9 @@ function UsageWindowCard({
         />
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-3 text-3xs text-foreground/40 leading-4">
-        <span className="tabular-nums">{100 - left}% used</span>
+        <span className="tabular-nums">{gt("{used}% used", { used: 100 - left })}</span>
         <span className="truncate text-right tabular-nums">
-          {reset ? `Resets in ${reset}` : null}
+          {reset ? gt("Resets in {duration}", { duration: reset }) : null}
         </span>
       </div>
     </section>

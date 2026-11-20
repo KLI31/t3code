@@ -22,7 +22,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
-import { useGT } from "gt-react";
+import { msg, useGT } from "gt-react";
 import {
   type DragEvent,
   type HTMLAttributes,
@@ -36,6 +36,7 @@ import {
 } from "react";
 
 import { isElectron } from "../../env";
+import { m } from "../../i18n/messages";
 import { useHandleNewThread } from "../../hooks/useHandleNewThread";
 import { readNewThreadProjectRef } from "../../shortcuts/chatRouteCommands";
 import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
@@ -711,7 +712,7 @@ export function WorkspaceTabs() {
     setRenamingKey(null);
     const trimmed = title.trim();
     if (trimmed.length === 0) {
-      toastManager.add({ type: "warning", title: "Thread title cannot be empty" });
+      toastManager.add({ type: "warning", title: m(msg("Thread title cannot be empty")) });
       return;
     }
     if (trimmed === originalTitle || !canRename(threadRef)) return;
@@ -723,8 +724,8 @@ export function WorkspaceTabs() {
         const error = squashAtomCommandFailure(result);
         toastManager.add({
           type: "error",
-          title: "Failed to rename thread",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: m(msg("Failed to rename thread")),
+          description: error instanceof Error ? error.message : m(msg("An error occurred.")),
         });
       }
     });

@@ -1,6 +1,7 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { AuthFilesystemWriteScope, type EnvironmentId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
+import { T, Var, useGT } from "gt-react";
 import {
   ArrowLeftIcon,
   FolderOpenIcon,
@@ -47,21 +48,24 @@ export function NotesPage() {
   const environment = usePrimaryEnvironment();
   const settings = environment?.serverConfig?.settings;
   const chooseFolder = useChooseVaultFolder(environment?.environmentId ?? null);
+  const gt = useGT();
   return (
-    <AppRouteModal label="Notes">
+    <AppRouteModal label={gt("Notes")}>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex min-h-12 shrink-0 items-center gap-1 border-b ps-5 pe-2">
-          <WorkspaceBreadcrumb ariaLabel="Notes breadcrumb" className="min-w-0 flex-1">
+          <WorkspaceBreadcrumb ariaLabel={gt("Notes breadcrumb")} className="min-w-0 flex-1">
             <WorkspaceBreadcrumbItem current>
-              <h1>Notes</h1>
+              <h1>
+                <T>Notes</T>
+              </h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
           {chooseFolder && settings?.notesVaultPath ? (
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Change notes folder"
-              title={`Notes folder: ${settings.notesVaultPath}`}
+              aria-label={gt("Change notes folder")}
+              title={gt("Notes folder: {path}", { path: settings.notesVaultPath })}
               onClick={() => void chooseFolder()}
             >
               <FolderOpenIcon />
@@ -70,11 +74,13 @@ export function NotesPage() {
           <AppRouteModalClose />
         </header>
         {environment === null || settings === undefined ? (
-          <NotesMessage title="Connect an environment to see notes." />
+          <NotesMessage title={gt("Connect an environment to see notes.")} />
         ) : settings.notesVaultPath === "" ? (
           <NotesMessage
-            title="No notes folder"
-            description="Choose an Obsidian vault or any folder of Markdown notes on this machine."
+            title={gt("No notes folder")}
+            description={gt(
+              "Choose an Obsidian vault or any folder of Markdown notes on this machine.",
+            )}
             showSettings
             onChooseFolder={chooseFolder}
           />
@@ -109,11 +115,11 @@ function NotesMessage({
           {onChooseFolder ? (
             <Button onClick={() => void onChooseFolder()}>
               <FolderOpenIcon />
-              Choose folder
+              <T>Choose folder</T>
             </Button>
           ) : null}
           <Button variant="outline" onClick={() => void navigate({ to: "/settings/general" })}>
-            Open settings
+            <T>Open settings</T>
           </Button>
         </EmptyContent>
       ) : null}
@@ -129,6 +135,7 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
   const canWrite = useEnvironmentScope(environmentId, AuthFilesystemWriteScope);
   const writeNote = useAtomCommand(filesystemEnvironment.writeNote, "Create note");
   const searchQuery = useDebouncedValue(query.trim(), 200);
+  const gt = useGT();
   const list = useEnvironmentQuery(
     filesystemEnvironment.listNotes({
       environmentId,
@@ -153,7 +160,7 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
   };
 
   if (list.error !== null && list.data === null) {
-    return <NotesMessage title="Notes unavailable" description={list.error} showSettings />;
+    return <NotesMessage title={gt("Notes unavailable")} description={list.error} showSettings />;
   }
 
   return (
@@ -171,16 +178,16 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
               size="sm"
               value={query}
               onValueChange={setQuery}
-              placeholder="Search notes"
-              aria-label="Search notes"
+              placeholder={gt("Search notes")}
+              aria-label={gt("Search notes")}
               spellCheck={false}
             />
             {canWrite ? (
               <Button
                 size="icon-sm"
                 variant="outline"
-                aria-label="New note"
-                title="New note"
+                aria-label={gt("New note")}
+                title={gt("New note")}
                 onClick={() => setNewNoteName("")}
               >
                 <PlusIcon />
@@ -208,8 +215,8 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
                 onBlur={() => {
                   if (newNoteName.trim() === "") setNewNoteName(null);
                 }}
-                placeholder="Note name, then Enter"
-                aria-label="New note name"
+                placeholder={gt("Note name, then Enter")}
+                aria-label={gt("New note name")}
                 spellCheck={false}
               />
             </form>
@@ -224,7 +231,9 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
             </div>
           ) : list.data.notes.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              {searchQuery === "" ? "No Markdown notes in this vault." : "No matching notes."}
+              {searchQuery === ""
+                ? gt("No Markdown notes in this vault.")
+                : gt("No matching notes.")}
             </p>
           ) : (
             <ul className="px-1.5 pb-3">
@@ -248,7 +257,10 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
               ))}
               {list.data.truncated ? (
                 <li className="px-2.5 py-2 text-xs text-muted-foreground">
-                  Showing the {list.data.notes.length} most recent notes. Search to find others.
+                  <T>
+                    Showing the <Var>{list.data.notes.length}</Var> most recent notes. Search to
+                    find others.
+                  </T>
                 </li>
               ) : null}
             </ul>
@@ -265,7 +277,9 @@ function NotesBrowser({ environmentId }: { environmentId: EnvironmentId }) {
           <Empty size="compact">
             <EmptyHeader>
               <StickyNoteIcon className="mb-2 size-5 text-muted-foreground" />
-              <EmptyDescription>Select a note to read it.</EmptyDescription>
+              <EmptyDescription>
+                <T>Select a note to read it.</T>
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
@@ -307,6 +321,7 @@ function NoteView({
   );
   const writeNote = useAtomCommand(filesystemEnvironment.writeNote, "Save note");
   const addComposerFiles = usePendingComposerFilesStore((state) => state.add);
+  const gt = useGT();
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const content = draft ?? note.data?.content ?? "";
@@ -326,13 +341,13 @@ function NoteView({
     if (!note.data) return;
     const fileName = path.split("/").at(-1) ?? path;
     addComposerFiles([new File([note.data.content], fileName, { type: "text/markdown" })]);
-    toastManager.add({ type: "success", title: `Added ${fileName} to the chat` });
+    toastManager.add({ type: "success", title: gt("Added {fileName} to the chat", { fileName }) });
   };
   return (
     <>
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 sm:px-6">
         <span className="sm:hidden">
-          <Button size="icon-sm" variant="ghost" aria-label="Back to notes" onClick={onBack}>
+          <Button size="icon-sm" variant="ghost" aria-label={gt("Back to notes")} onClick={onBack}>
             <ArrowLeftIcon />
           </Button>
         </span>
@@ -353,10 +368,10 @@ function NoteView({
                 onEditingChange(false);
               }}
             >
-              Cancel
+              <T>Cancel</T>
             </Button>
             <Button size="sm" disabled={saving || draft === null} onClick={() => void save()}>
-              Save
+              <T>Save</T>
             </Button>
           </>
         ) : note.data ? (
@@ -365,8 +380,8 @@ function NoteView({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Edit note"
-                title="Edit note"
+                aria-label={gt("Edit note")}
+                title={gt("Edit note")}
                 onClick={() => onEditingChange(true)}
               >
                 <PencilIcon />
@@ -377,7 +392,7 @@ function NoteView({
               onClick={addToChat}
             >
               <MessageSquarePlusIcon />
-              Add to chat
+              <T>Add to chat</T>
             </DialogPrimitive.Close>
           </>
         ) : null}
@@ -393,7 +408,7 @@ function NoteView({
               if (draft !== null) void save();
             }
           }}
-          aria-label="Note content"
+          aria-label={gt("Note content")}
           spellCheck={false}
           className="min-h-0 flex-1 resize-none bg-transparent px-4 py-6 font-mono text-sm leading-relaxed text-foreground outline-none sm:px-8"
         />

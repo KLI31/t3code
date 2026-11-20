@@ -1,8 +1,10 @@
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { DesktopQuickComposerLaunch } from "@t3tools/contracts";
+import { msg } from "gt-react";
 import { useEffect, useEffectEvent } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
+import { m } from "../../i18n/messages";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { useQuickComposerAutoSendStore } from "../../quickComposer";
 import { stackedThreadToast, toastManager } from "../ui/toast";
@@ -18,7 +20,9 @@ export function QuickComposerLaunchCoordinator() {
       { prompt: request.prompt },
     ).catch(() => null);
     if (opened === null) {
-      toastManager.add(stackedThreadToast({ type: "error", title: "Could not start the thread" }));
+      toastManager.add(
+        stackedThreadToast({ type: "error", title: m(msg("Could not start the thread")) }),
+      );
       return;
     }
     // A draft the user already typed in keeps its text, and must not be sent in its place.
@@ -29,8 +33,8 @@ export function QuickComposerLaunchCoordinator() {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "This project already has a draft",
-          description: "Your prompt was copied to the clipboard instead of sent.",
+          title: m(msg("This project already has a draft")),
+          description: m(msg("Your prompt was copied to the clipboard instead of sent.")),
         }),
       );
       return;

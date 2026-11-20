@@ -6,6 +6,7 @@ import {
   type ChatBackgroundScope,
 } from "@t3tools/contracts/settings";
 import type { CSSProperties } from "react";
+import { msg, T, useGT, useMessages } from "gt-react";
 
 import {
   removeChatBackgroundImage,
@@ -16,20 +17,20 @@ import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 const EFFECT_LABELS: Record<ChatBackgroundEffect, string> = {
-  none: "None",
-  dither: "Dither (default)",
-  halftone: "Halftone",
+  none: msg("None"),
+  dither: msg("Dither (default)", { $context: "background effect" }),
+  halftone: msg("Halftone", { $context: "background effect" }),
   ascii: "ASCII",
-  scanlines: "Scanlines",
+  scanlines: msg("Scanlines", { $context: "background effect" }),
 };
 
 const SCOPE_LABELS: Record<ChatBackgroundScope, string> = {
-  empty: "New threads",
-  all: "All threads (default)",
+  empty: msg("New threads"),
+  all: msg("All threads (default)"),
 };
 
 const reportError = (title: string, error: unknown) =>
@@ -40,6 +41,9 @@ const reportError = (title: string, error: unknown) =>
   });
 
 export function ChatBackgroundSettings() {
+  const gt = useGT();
+  const m = useMessages();
+  const searchableSetting = useSearchableSetting();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const preview = useChatBackgroundUrl(settings.chatBackgroundEffect, false);
@@ -52,17 +56,19 @@ export function ChatBackgroundSettings() {
   } as CSSProperties;
 
   return (
-    <SettingsSection id="appearance-chat-background" title="Chat background">
+    <SettingsSection id="appearance-chat-background" title={gt("Chat background")}>
       <SettingsRow
         {...searchableSetting("chat-background-image")}
-        description="Show your own artwork behind the chat. It stays on this device."
+        description={gt("Show your own artwork behind the chat. It stays on this device.")}
         control={
           <div className="flex items-center gap-2">
             {preview ? (
               <img alt="" src={preview} className="h-8 w-12 rounded-md border object-cover" />
             ) : null}
             <Button size="sm" variant="outline" render={<label />}>
-              {preview ? "Replace" : "Choose image"}
+              {preview
+                ? gt("Replace", { $context: "verb, replaces the background image" })
+                : gt("Choose image")}
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/gif,image/webp"
@@ -72,7 +78,7 @@ export function ChatBackgroundSettings() {
                   event.currentTarget.value = "";
                   if (file) {
                     setChatBackgroundImage(file).catch((error: unknown) =>
-                      reportError("Could not set the chat background", error),
+                      reportError(gt("Could not set the chat background"), error),
                     );
                   }
                 }}
@@ -84,11 +90,11 @@ export function ChatBackgroundSettings() {
                 variant="ghost"
                 onClick={() =>
                   removeChatBackgroundImage().catch((error: unknown) =>
-                    reportError("Could not remove the chat background", error),
+                    reportError(gt("Could not remove the chat background"), error),
                   )
                 }
               >
-                Remove
+                <T context="verb, removes the background image">Remove</T>
               </Button>
             ) : null}
           </div>
@@ -96,11 +102,13 @@ export function ChatBackgroundSettings() {
       />
       <SettingsRow
         {...searchableSetting("chat-background-effect")}
-        description="Rebuild the artwork as dithered pixels, print dots, characters, or display lines."
+        description={gt(
+          "Rebuild the artwork as dithered pixels, print dots, characters, or display lines.",
+        )}
         resetAction={
           settings.chatBackgroundEffect !== DEFAULT_UNIFIED_SETTINGS.chatBackgroundEffect ? (
             <SettingResetButton
-              label="background effect"
+              ariaLabel={gt("Reset background effect to default")}
               onClick={() =>
                 updateSettings({
                   chatBackgroundEffect: DEFAULT_UNIFIED_SETTINGS.chatBackgroundEffect,
@@ -119,14 +127,14 @@ export function ChatBackgroundSettings() {
             <SelectTrigger
               size="sm"
               className="w-full min-w-0 sm:w-52"
-              aria-label="Background effect"
+              aria-label={gt("Background effect")}
             >
-              <SelectValue>{EFFECT_LABELS[settings.chatBackgroundEffect]}</SelectValue>
+              <SelectValue>{m(EFFECT_LABELS[settings.chatBackgroundEffect])}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
               {(Object.keys(EFFECT_LABELS) as ChatBackgroundEffect[]).map((effect) => (
                 <SelectItem key={effect} value={effect}>
-                  {EFFECT_LABELS[effect]}
+                  {m(EFFECT_LABELS[effect])}
                 </SelectItem>
               ))}
             </SelectPopup>
@@ -135,11 +143,13 @@ export function ChatBackgroundSettings() {
       />
       <SettingsRow
         {...searchableSetting("chat-background-scope")}
-        description="Show the artwork only while starting a thread, or behind every conversation."
+        description={gt(
+          "Show the artwork only while starting a thread, or behind every conversation.",
+        )}
         resetAction={
           settings.chatBackgroundScope !== DEFAULT_UNIFIED_SETTINGS.chatBackgroundScope ? (
             <SettingResetButton
-              label="background scope"
+              ariaLabel={gt("Reset background scope to default")}
               onClick={() =>
                 updateSettings({
                   chatBackgroundScope: DEFAULT_UNIFIED_SETTINGS.chatBackgroundScope,
@@ -158,24 +168,24 @@ export function ChatBackgroundSettings() {
             <SelectTrigger
               size="sm"
               className="w-full min-w-0 sm:w-52"
-              aria-label="Show background on"
+              aria-label={gt("Show background on")}
             >
-              <SelectValue>{SCOPE_LABELS[settings.chatBackgroundScope]}</SelectValue>
+              <SelectValue>{m(SCOPE_LABELS[settings.chatBackgroundScope])}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value="empty">{SCOPE_LABELS.empty}</SelectItem>
-              <SelectItem value="all">{SCOPE_LABELS.all}</SelectItem>
+              <SelectItem value="empty">{m(SCOPE_LABELS.empty)}</SelectItem>
+              <SelectItem value="all">{m(SCOPE_LABELS.all)}</SelectItem>
             </SelectPopup>
           </Select>
         }
       />
       <SettingsRow
         {...searchableSetting("chat-background-opacity")}
-        description="How strongly the artwork shows through."
+        description={gt("How strongly the artwork shows through.")}
         resetAction={
           settings.chatBackgroundOpacity !== DEFAULT_UNIFIED_SETTINGS.chatBackgroundOpacity ? (
             <SettingResetButton
-              label="background visibility"
+              ariaLabel={gt("Reset background visibility to default")}
               onClick={() =>
                 updateSettings({
                   chatBackgroundOpacity: DEFAULT_UNIFIED_SETTINGS.chatBackgroundOpacity,
@@ -193,7 +203,7 @@ export function ChatBackgroundSettings() {
               {settings.chatBackgroundOpacity}%
             </output>
             <input
-              aria-label="Background visibility"
+              aria-label={gt("Background visibility")}
               className="settings-slider min-w-0 flex-1"
               id="chat-background-opacity"
               max={MAX_CHAT_BACKGROUND_OPACITY}

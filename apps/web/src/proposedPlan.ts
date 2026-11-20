@@ -1,10 +1,14 @@
 import { stripDisplayedPlanMarkdown, proposedPlanTitle } from "@t3tools/shared/proposedPlanText";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "./i18n/messages";
 
 export function buildCollapsedProposedPlanPreviewMarkdown(
   planMarkdown: string,
   options?: {
     maxLines?: number;
   },
+  resolve: MessageResolver = m,
 ): string {
   const maxLines = options?.maxLines ?? 8;
   const lines = stripDisplayedPlanMarkdown(planMarkdown)
@@ -32,7 +36,7 @@ export function buildCollapsedProposedPlanPreviewMarkdown(
   }
 
   if (previewLines.length === 0) {
-    return proposedPlanTitle(planMarkdown) ?? "Plan preview unavailable.";
+    return proposedPlanTitle(planMarkdown) ?? resolve(msg("Plan preview unavailable."));
   }
 
   if (hasMoreContent) {
@@ -78,8 +82,10 @@ export function resolvePlanFollowUpSubmission(input: { draftText: string; planMa
 export function buildPlanImplementationThreadTitle(planMarkdown: string): string {
   const title = proposedPlanTitle(planMarkdown);
   if (!title) {
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- stored on the server as the thread title, shared by every viewer
     return "Implement plan";
   }
+  // oxlint-disable-next-line t3code/no-untranslated-copy -- stored on the server as the thread title, shared by every viewer
   return `Implement ${title}`;
 }
 
